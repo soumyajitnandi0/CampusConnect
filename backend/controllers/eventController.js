@@ -1,0 +1,268 @@
+const Event = require('../models/Event');
+const RSVP = require('../models/RSVP');
+const User = require('../models/User');
+
+// Get all events
+exports.getEvents = async (req, res) => {
+    try {
+        const events = await Event.find()
+            .populate('organizer', 'name email')
+            .sort({ date: 1 });
+        
+        // Transform to include RSVP arrays
+        const eventsWithRSVPs = await Promise.all(
+            events.map(async (event) => {
+                const rsvps = await RSVP.find({ event: event._id, status: 'going' });
+                const checkedIn = await RSVP.find({ event: event._id, attended: true });
+                
+                return {
+                    ...event.toObject(),
+                    rsvps: rsvps.map(r => r.user.toString()),
+                    checkedIn: checkedIn.map(r => r.user.toString()),
+                };
+            })
+        );
+        
+        res.json(eventsWithRSVPs);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ msg: 'Server Error' });
+    }
+};
+
+// Get single event by ID
+exports.getEventById = async (req, res) => {
+    try {
+        const event = await Event.findById(req.params.id)
+            .populate('organizer', 'name email');
+        
+        if (!event) {
+            return res.status(404).json({ msg: 'Event not found' });
+        }
+
+        const rsvps = await RSVP.find({ event: event._id, status: 'going' });
+        const checkedIn = await RSVP.find({ event: event._id, attended: true });
+
+        res.json({
+            ...event.toObject(),
+            rsvps: rsvps.map(r => r.user.toString()),
+            checkedIn: checkedIn.map(r => r.user.toString()),
+        });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ msg: 'Server Error' });
+    }
+};
+
+// Get events by organizer
+exports.getEventsByOrganizer = async (req, res) => {
+    try {
+        const organizerId = req.params.organizerId;
+        const events = await Event.find({ organizer: organizerId })
+            .populate('organizer', 'name email')
+            .sort({ date: 1 });
+        
+        const eventsWithRSVPs = await Promise.all(
+            events.map(async (event) => {
+                const rsvps = await RSVP.find({ event: event._id, status: 'going' });
+                const checkedIn = await RSVP.find({ event: event._id, attended: true });
+                
+                return {
+                    ...event.toObject(),
+                    rsvps: rsvps.map(r => r.user.toString()),
+                    checkedIn: checkedIn.map(r => r.user.toString()),
+                };
+            })
+        );
+        
+        res.json(eventsWithRSVPs);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ msg: 'Server Error' });
+    }
+};
+
+// Create event
+exports.createEvent = async (req, res) => {
+    try {
+        const { title, description, date, location, category, imageUrl } = req.body;
+
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ msg: 'Authentication required' });
+        }
+
+        // Verify user is organizer
+        const user = await User.findById(req.user.id);
+        if (!user || user.role !== 'organizer') {
+            return res.status(403).json({ msg: 'Only organizers can create events' });
+        }
+
+        // Validate required fields
+        if (!title || !description || !date || !location) {
+            return res.status(400).json({ msg: 'Please provide all required fields' });
+        }
+
+        // Validate date is not in the past
+        const eventDate = new Date(date);
+        const now = new Date();
+        now.setHours(0, 0, 0, 0); // Set to start of today for comparison
+        
+        if (eventDate < now) {
+            return res.status(400).json({ msg: 'Cannot create events in the past. Please select a future date.' });
+        }
+
+        // Clean and validate imageUrl
+        let cleanImageUrl = imageUrl;
+        if (imageUrl && typeof imageUrl === 'string') {
+            cleanImageUrl = imageUrl.trim();
+            if (cleanImageUrl === '') {
+                cleanImageUrl = undefined;
+            }
+        } else {
+            cleanImageUrl = undefined;
+        }
+
+        const newEvent = new Event({
+            title,
+            description,
+            date,
+            location,
+            category,
+            imageUrl: cleanImageUrl,
+            organizer: req.user.id,
+        });
+
+        const event = await newEvent.save();
+        res.json(event);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ msg: 'Server Error' });
+    }
+};
+
+// Update event
+exports.updateEvent = async (req, res) => {
+    try {
+        const eventId = req.params.id;
+        const event = await Event.findById(eventId);
+
+        if (!event) {
+            return res.status(404).json({ msg: 'Event not found' });
+        }
+
+        // Check if user is the organizer
+        if (event.organizer.toString() !== req.user.id) {
+            return res.status(403).json({ msg: 'Not authorized to update this event' });
+        }
+
+        const { title, description, date, location, category, imageUrl } = req.body;
+        
+        if (title) event.title = title;
+        if (description) event.description = description;
+        if (date) event.date = date;
+        if (location) event.location = location;
+        if (category) event.category = category;
+        if (imageUrl !== undefined) event.imageUrl = imageUrl;
+
+        await event.save();
+        res.json(event);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ msg: 'Server Error' });
+    }
+};
+
+// Delete event
+exports.deleteEvent = async (req, res) => {
+    try {
+        const eventId = req.params.id;
+        const event = await Event.findById(eventId);
+
+        if (!event) {
+            return res.status(404).json({ msg: 'Event not found' });
+        }
+
+        // Check if user is the organizer
+        if (event.organizer.toString() !== req.user.id) {
+            return res.status(403).json({ msg: 'Not authorized to delete this event' });
+        }
+
+        // Delete all RSVPs for this event
+        await RSVP.deleteMany({ event: eventId });
+        
+        await Event.findByIdAndDelete(eventId);
+        res.json({ msg: 'Event deleted successfully' });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ msg: 'Server Error' });
+    }
+};
+
+// RSVP to event
+exports.rsvpEvent = async (req, res) => {
+    try {
+        const eventId = req.params.id;
+        const userId = req.user.id;
+        const { status } = req.body;
+
+        // Get event to check if it's in the past
+        const event = await Event.findById(eventId);
+        if (!event) {
+            return res.status(404).json({ msg: 'Event not found' });
+        }
+
+        // Check if event date has passed
+        const eventDate = new Date(event.date);
+        const now = new Date();
+        
+        if (eventDate < now) {
+            return res.status(400).json({ msg: 'Cannot RSVP to past events' });
+        }
+
+        let rsvp = await RSVP.findOne({ event: eventId, user: userId });
+
+        if (rsvp) {
+            rsvp.status = status || 'going';
+            await rsvp.save();
+        } else {
+            rsvp = new RSVP({
+                event: eventId,
+                user: userId,
+                status: status || 'going',
+            });
+            await rsvp.save();
+
+            // Increment RSVP count
+            await Event.findByIdAndUpdate(eventId, { $inc: { rsvpCount: 1 } });
+        }
+
+        res.json(rsvp);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ msg: 'Server Error' });
+    }
+};
+
+// Cancel RSVP
+exports.cancelRSVP = async (req, res) => {
+    try {
+        const eventId = req.params.id;
+        const userId = req.user.id;
+
+        const rsvp = await RSVP.findOne({ event: eventId, user: userId });
+        
+        if (!rsvp) {
+            return res.status(404).json({ msg: 'RSVP not found' });
+        }
+
+        await RSVP.findByIdAndDelete(rsvp._id);
+        
+        // Decrement RSVP count
+        await Event.findByIdAndUpdate(eventId, { $inc: { rsvpCount: -1 } });
+
+        res.json({ msg: 'RSVP cancelled successfully' });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ msg: 'Server Error' });
+    }
+};
