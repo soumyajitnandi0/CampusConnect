@@ -50,6 +50,13 @@ export default function OrganizerLayout() {
                 }}
             />
             <Tabs.Screen
+                name="clubs"
+                options={{
+                    title: 'Clubs',
+                    tabBarIcon: ({ color }) => <TabBarIcon name="group" color={color} />,
+                }}
+            />
+            <Tabs.Screen
                 name="create-event"
                 options={{
                     title: 'Create',
@@ -64,6 +71,18 @@ export default function OrganizerLayout() {
                 }}
             />
             <Tabs.Screen
+                name="create-club"
+                options={{
+                    href: null, // Hide from tab bar
+                }}
+            />
+            <Tabs.Screen
+                name="reschedule-event"
+                options={{
+                    href: null, // Hide from tab bar
+                }}
+            />
+            <Tabs.Screen
                 name="profile"
                 options={{
                     title: 'Profile',
@@ -72,6 +91,18 @@ export default function OrganizerLayout() {
             />
             <Tabs.Screen
                 name="event-details"
+                options={{
+                    href: null, // Hide from tab bar
+                }}
+            />
+            <Tabs.Screen
+                name="club-details"
+                options={{
+                    href: null, // Hide from tab bar
+                }}
+            />
+            <Tabs.Screen
+                name="club-chat"
                 options={{
                     href: null, // Hide from tab bar
                 }}

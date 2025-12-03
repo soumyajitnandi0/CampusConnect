@@ -7,6 +7,7 @@ exports.getEvents = async (req, res) => {
     try {
         const events = await Event.find()
             .populate('organizer', 'name email')
+            .populate('club', 'name imageUrl')
             .sort({ date: 1 });
         
         // Transform to include RSVP arrays
@@ -34,7 +35,8 @@ exports.getEvents = async (req, res) => {
 exports.getEventById = async (req, res) => {
     try {
         const event = await Event.findById(req.params.id)
-            .populate('organizer', 'name email');
+            .populate('organizer', 'name email')
+            .populate('club', 'name imageUrl');
         
         if (!event) {
             return res.status(404).json({ msg: 'Event not found' });
@@ -60,6 +62,7 @@ exports.getEventsByOrganizer = async (req, res) => {
         const organizerId = req.params.organizerId;
         const events = await Event.find({ organizer: organizerId })
             .populate('organizer', 'name email')
+            .populate('club', 'name imageUrl')
             .sort({ date: 1 });
         
         const eventsWithRSVPs = await Promise.all(
@@ -103,6 +106,7 @@ exports.getMyEvents = async (req, res) => {
         const organizerId = req.user.id;
         const events = await Event.find({ organizer: organizerId })
             .populate('organizer', 'name email')
+            .populate('club', 'name imageUrl')
             .sort({ date: 1 });
         
         const eventsWithRSVPs = await Promise.all(
@@ -134,7 +138,7 @@ exports.getMyEvents = async (req, res) => {
 // Create event
 exports.createEvent = async (req, res) => {
     try {
-        const { title, description, date, location, category, imageUrl } = req.body;
+        const { title, description, date, location, category, imageUrl, duration, club } = req.body;
 
         if (!req.user || !req.user.id) {
             return res.status(401).json({ msg: 'Authentication required' });
@@ -171,6 +175,26 @@ exports.createEvent = async (req, res) => {
             cleanImageUrl = undefined;
         }
 
+        // Prepare duration object with defaults
+        const eventDuration = {
+            days: duration?.days || 0,
+            hours: duration?.hours || 0,
+            minutes: duration?.minutes || 0
+        };
+
+        // Validate club if provided
+        if (club) {
+            const Club = require('../models/Club');
+            const clubExists = await Club.findById(club);
+            if (!clubExists) {
+                return res.status(400).json({ msg: 'Club not found' });
+            }
+            // Verify organizer owns the club
+            if (clubExists.organizer.toString() !== req.user.id) {
+                return res.status(403).json({ msg: 'You can only create events for clubs you own' });
+            }
+        }
+
         const newEvent = new Event({
             title,
             description,
@@ -178,7 +202,9 @@ exports.createEvent = async (req, res) => {
             location,
             category,
             imageUrl: cleanImageUrl,
+            duration: eventDuration,
             organizer: req.user.id,
+            club: club || undefined,
         });
 
         const event = await newEvent.save();
@@ -204,14 +230,21 @@ exports.updateEvent = async (req, res) => {
             return res.status(403).json({ msg: 'Not authorized to update this event' });
         }
 
-        const { title, description, date, location, category, imageUrl } = req.body;
-        
+        const { title, description, date, location, category, imageUrl, duration } = req.body;
+
         if (title) event.title = title;
         if (description) event.description = description;
         if (date) event.date = date;
         if (location) event.location = location;
         if (category) event.category = category;
         if (imageUrl !== undefined) event.imageUrl = imageUrl;
+        if (duration) {
+            event.duration = {
+                days: duration.days || 0,
+                hours: duration.hours || 0,
+                minutes: duration.minutes || 0
+            };
+        }
 
         await event.save();
         res.json(event);
@@ -258,6 +291,11 @@ exports.rsvpEvent = async (req, res) => {
         const event = await Event.findById(eventId);
         if (!event) {
             return res.status(404).json({ msg: 'Event not found' });
+        }
+
+        // Check if event is canceled
+        if (event.status === 'canceled') {
+            return res.status(400).json({ msg: 'Cannot RSVP to canceled events' });
         }
 
         // Check if event date has passed
@@ -310,6 +348,85 @@ exports.cancelRSVP = async (req, res) => {
         await Event.findByIdAndUpdate(eventId, { $inc: { rsvpCount: -1 } });
 
         res.json({ msg: 'RSVP cancelled successfully' });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ msg: 'Server Error' });
+    }
+};
+
+// Cancel event
+exports.cancelEvent = async (req, res) => {
+    try {
+        const eventId = req.params.id;
+        const { reason } = req.body;
+        const event = await Event.findById(eventId);
+
+        if (!event) {
+            return res.status(404).json({ msg: 'Event not found' });
+        }
+
+        // Check if user is the organizer
+        if (event.organizer.toString() !== req.user.id) {
+            return res.status(403).json({ msg: 'Not authorized to cancel this event' });
+        }
+
+        // Check if event is already canceled
+        if (event.status === 'canceled') {
+            return res.status(400).json({ msg: 'Event is already canceled' });
+        }
+
+        event.status = 'canceled';
+        if (reason) {
+            event.cancelReason = reason;
+        }
+
+        await event.save();
+        res.json({ msg: 'Event canceled successfully', event });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ msg: 'Server Error' });
+    }
+};
+
+// Reschedule event
+exports.rescheduleEvent = async (req, res) => {
+    try {
+        const eventId = req.params.id;
+        const { date, location } = req.body;
+        const event = await Event.findById(eventId);
+
+        if (!event) {
+            return res.status(404).json({ msg: 'Event not found' });
+        }
+
+        // Check if user is the organizer
+        if (event.organizer.toString() !== req.user.id) {
+            return res.status(403).json({ msg: 'Not authorized to reschedule this event' });
+        }
+
+        // Validate new date is not in the past
+        if (date) {
+            const newDate = new Date(date);
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+            
+            if (newDate < now) {
+                return res.status(400).json({ msg: 'Cannot reschedule to a past date' });
+            }
+        }
+
+        // Update event
+        if (date) {
+            event.date = new Date(date);
+            event.rescheduledDate = new Date(date);
+        }
+        if (location) {
+            event.location = location;
+        }
+        event.status = 'rescheduled';
+
+        await event.save();
+        res.json({ msg: 'Event rescheduled successfully', event });
     } catch (err) {
         console.error(err.message);
         res.status(500).json({ msg: 'Server Error' });

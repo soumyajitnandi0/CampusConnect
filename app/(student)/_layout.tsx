@@ -58,8 +58,7 @@ export default function TabLayout() {
                     <Tabs.Screen
                         name="my-events"
                         options={{
-                            title: 'My Events',
-                            tabBarIcon: ({ color }) => <TabBarIcon name="calendar" color={color} />,
+                            href: null, // Hide from tab bar
                         }}
                     />
                     <Tabs.Screen
@@ -70,7 +69,26 @@ export default function TabLayout() {
                         }}
                     />
                     <Tabs.Screen
+                        name="clubs"
+                        options={{
+                            title: 'Clubs',
+                            tabBarIcon: ({ color }) => <TabBarIcon name="group" color={color} />,
+                        }}
+                    />
+                    <Tabs.Screen
                         name="scan"
+                        options={{
+                            href: null, // Hide from tab bar
+                        }}
+                    />
+                    <Tabs.Screen
+                        name="club-details"
+                        options={{
+                            href: null, // Hide from tab bar
+                        }}
+                    />
+                    <Tabs.Screen
+                        name="club-chat"
                         options={{
                             href: null, // Hide from tab bar
                         }}

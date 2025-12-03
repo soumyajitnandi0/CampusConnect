@@ -83,13 +83,33 @@ exports.verifyQR = async (req, res) => {
         }
 
         // Create check-in record with current date and time
-        const checkIn = new CheckIn({
-            user: userId,
-            event: finalEventId,
-            checkInTime: new Date(), // Store exact check-in date and time
-            qrData: qrDataObj || null,
-        });
-        await checkIn.save();
+        // Wrap in try-catch to handle race conditions
+        let checkIn;
+        try {
+            checkIn = new CheckIn({
+                user: userId,
+                event: finalEventId,
+                checkInTime: new Date(), // Store exact check-in date and time
+                qrData: qrDataObj || null,
+            });
+            await checkIn.save();
+        } catch (saveError) {
+            // Handle duplicate key error (race condition)
+            if (saveError.code === 11000 || saveError.message.includes('duplicate key')) {
+                // Fetch the existing check-in
+                const existingCheckIn = await CheckIn.findOne({ event: finalEventId, user: userId });
+                if (existingCheckIn) {
+                    checkIn = existingCheckIn;
+                    // Still update RSVP status below
+                } else {
+                    return res.status(400).json({ 
+                        msg: 'Already checked in'
+                    });
+                }
+            } else {
+                throw saveError; // Re-throw if it's a different error
+            }
+        }
 
         // Update RSVP status if exists, or create new one
         let rsvp = await RSVP.findOne({ event: finalEventId, user: userId });
@@ -138,6 +158,27 @@ exports.verifyQR = async (req, res) => {
         });
     } catch (err) {
         console.error('Check-in error:', err);
+        
+        // Handle duplicate key error specifically
+        if (err.code === 11000 || err.message.includes('duplicate key')) {
+            // Try to get the existing check-in
+            try {
+                const existingCheckIn = await CheckIn.findOne({ 
+                    user: req.body.userId || req.user?.id, 
+                    event: req.body.eventId 
+                });
+                if (existingCheckIn) {
+                    return res.status(400).json({ 
+                        msg: 'Already checked in',
+                        checkInTime: existingCheckIn.checkInTime
+                    });
+                }
+            } catch (findError) {
+                // If we can't find it, just return the duplicate error
+            }
+            return res.status(400).json({ msg: 'Already checked in' });
+        }
+        
         res.status(500).json({ msg: err.message || 'Server Error' });
     }
 };

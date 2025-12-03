@@ -32,6 +32,8 @@ connectDB();
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/events', require('./routes/eventRoutes'));
+app.use('/api/clubs', require('./routes/clubRoutes'));
+app.use('/api/chat', require('./routes/chatRoutes'));
 app.use('/api/attendance', require('./routes/attendanceRoutes'));
 app.use('/api/checkins', require('./routes/checkInRoutes'));
 app.use('/api/rsvps', require('./routes/rsvpRoutes'));

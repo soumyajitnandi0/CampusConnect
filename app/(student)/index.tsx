@@ -18,7 +18,6 @@ export default function HomeScreen() {
     const { events, loading, rsvpForEvent, cancelRSVP, isUserRSVPd, refreshEvents, isOfflineData } = useEvents();
     const { user } = useAuth();
     const [refreshing, setRefreshing] = useState(false);
-    const [activeTab, setActiveTab] = useState('Posts');
     const [searchQuery, setSearchQuery] = useState('');
 
     const onRefresh = async () => {
@@ -97,20 +96,6 @@ export default function HomeScreen() {
                         </View>
                     </View>
 
-                    {/* Desktop Tabs */}
-                    <View className="flex-row space-x-4 border-b border-white/10 pb-1">
-                        {['Posts', 'Q&A', 'Community'].map((tab) => (
-                            <TouchableOpacity
-                                key={tab}
-                                onPress={() => setActiveTab(tab)}
-                                className={`px-4 py-2 border-b-2 ${activeTab === tab ? 'border-white' : 'border-transparent'}`}
-                            >
-                                <Text className={`font-bold text-base ${activeTab === tab ? 'text-white' : 'text-gray-400'}`}>
-                                    {tab}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
                 </View>
             );
         }
@@ -142,7 +127,7 @@ export default function HomeScreen() {
                 </View>
 
                 {/* Search Bar */}
-                <View className="mb-6">
+                <View className="mb-4">
                     <GlassInput
                         placeholder="Search events..."
                         value={searchQuery}
@@ -151,23 +136,6 @@ export default function HomeScreen() {
                         containerStyle={{ marginBottom: 0 }}
                     />
                 </View>
-
-                {/* Tabs */}
-                <GlassContainer className="rounded-xl" contentClassName="flex-row justify-around p-1" intensity={15}>
-                    {['Posts', 'Q&A', 'Community'].map((tab) => (
-                        <TouchableOpacity
-                            key={tab}
-                            onPress={() => setActiveTab(tab)}
-                            className={`flex-1 py-3 rounded-lg items-center ${activeTab === tab ? 'bg-white/20' : 'bg-transparent'
-                                }`}
-                        >
-                            <Text className={`font-semibold text-sm ${activeTab === tab ? 'text-white' : 'text-gray-400'
-                                }`}>
-                                {tab}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
-                </GlassContainer>
             </View>
         );
     };

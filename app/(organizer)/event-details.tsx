@@ -1,7 +1,7 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { GlassButton } from '../../components/ui/GlassButton';
 import { GlassContainer } from '../../components/ui/GlassContainer';
 import { ScreenWrapper } from '../../components/ui/ScreenWrapper';
@@ -13,6 +13,7 @@ export default function EventDetails() {
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [actionLoading, setActionLoading] = useState(false);
     const router = useRouter();
 
     const fetchDetails = async () => {
@@ -34,6 +35,40 @@ export default function EventDetails() {
     useEffect(() => {
         fetchDetails();
     }, [id]);
+
+    const handleCancelEvent = async () => {
+        Alert.alert(
+            'Cancel Event',
+            'Are you sure you want to cancel this event? This action cannot be undone.',
+            [
+                {
+                    text: 'No',
+                    style: 'cancel'
+                },
+                {
+                    text: 'Yes, Cancel',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            setActionLoading(true);
+                            const token = await storage.getItem('token');
+                            
+                            await api.post(`/events/${id}/cancel`, 
+                                {},
+                                { headers: { 'x-auth-token': token } }
+                            );
+                            Alert.alert('Success', 'Event has been canceled');
+                            fetchDetails(); // Refresh data
+                        } catch (err: any) {
+                            Alert.alert('Error', err.response?.data?.msg || 'Failed to cancel event');
+                        } finally {
+                            setActionLoading(false);
+                        }
+                    }
+                }
+            ]
+        );
+    };
 
     if (loading) return (
         <ScreenWrapper className="justify-center items-center">
@@ -86,15 +121,78 @@ export default function EventDetails() {
                             })} • {event.location}
                         </Text>
 
-                        <GlassButton
-                            title="Open Scanner"
-                            icon="qrcode"
-                            onPress={() => router.push({
-                                pathname: '/(organizer)/scanner',
-                                params: { eventId: event._id }
-                            })}
-                            className="mt-2"
-                        />
+                        {/* Status Badge */}
+                        {event.status === 'canceled' && (
+                            <View className="mb-3 px-3 py-2 rounded-lg bg-red-500/20 border border-red-500/30">
+                                <Text className="text-red-400 font-bold text-sm">Event Canceled</Text>
+                                {event.cancelReason && (
+                                    <Text className="text-red-300 text-xs mt-1">{event.cancelReason}</Text>
+                                )}
+                            </View>
+                        )}
+                        {event.status === 'rescheduled' && (
+                            <View className="mb-3 px-3 py-2 rounded-lg bg-yellow-500/20 border border-yellow-500/30">
+                                <Text className="text-yellow-400 font-bold text-sm">Event Rescheduled</Text>
+                                {event.rescheduledDate && (
+                                    <Text className="text-yellow-300 text-xs mt-1">
+                                        New Date: {new Date(event.rescheduledDate).toLocaleDateString('en-US', {
+                                            weekday: 'long',
+                                            year: 'numeric',
+                                            month: 'long',
+                                            day: 'numeric'
+                                        })}
+                                    </Text>
+                                )}
+                            </View>
+                        )}
+
+                        {/* Action Buttons */}
+                        <View className="flex-row gap-3 mt-3">
+                            {event.status !== 'canceled' && (
+                                <>
+                                    <GlassButton
+                                        title="Open Scanner"
+                                        icon="qrcode"
+                                        onPress={() => router.push({
+                                            pathname: '/(organizer)/scanner',
+                                            params: { eventId: event._id }
+                                        })}
+                                        className="flex-1"
+                                        variant="primary"
+                                    />
+                                    <GlassButton
+                                        title="Reschedule"
+                                        icon="calendar"
+                                        onPress={() => router.push({
+                                            pathname: '/(organizer)/reschedule-event',
+                                            params: { eventId: event._id }
+                                        })}
+                                        className="flex-1"
+                                        variant="secondary"
+                                    />
+                                </>
+                            )}
+                        </View>
+
+                        {/* Cancel Button */}
+                        {event.status !== 'canceled' && (
+                            <TouchableOpacity
+                                onPress={handleCancelEvent}
+                                disabled={actionLoading}
+                                className="mt-3 rounded-xl overflow-hidden border border-red-500/30"
+                            >
+                                <View className="py-3 items-center justify-center bg-red-500/10" style={{ opacity: actionLoading ? 0.7 : 1 }}>
+                                    {actionLoading ? (
+                                        <ActivityIndicator size="small" color="#EF4444" />
+                                    ) : (
+                                        <View className="flex-row items-center">
+                                            <FontAwesome name="times-circle" size={18} color="#EF4444" style={{ marginRight: 8 }} />
+                                            <Text className="text-red-400 font-bold">Cancel Event</Text>
+                                        </View>
+                                    )}
+                                </View>
+                            </TouchableOpacity>
+                        )}
                     </GlassContainer>
 
                     {/* Stats */}

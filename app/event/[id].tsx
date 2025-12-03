@@ -51,6 +51,12 @@ export default function EventDetailsScreen() {
             return;
         }
 
+        // Check if event is canceled
+        if (event.status === 'canceled') {
+            Alert.alert('Event Canceled', 'This event has been canceled. You cannot RSVP to canceled events.');
+            return;
+        }
+
         const isPast = isEventPast(event);
         if (isPast) {
             Alert.alert('Event Ended', 'You cannot RSVP to past events.');
@@ -113,13 +119,15 @@ export default function EventDetailsScreen() {
     }
 
     const isPast = isEventPast(event);
+    const isCanceled = event?.status === 'canceled';
+    const isRescheduled = event?.status === 'rescheduled';
     // Check if user is RSVP'd - handle both array and string formats
     const rsvpsArray = event?.rsvps || [];
     const userId = user?.id || user?._id;
     const isRSVPd = user && rsvpsArray.length > 0 ? rsvpsArray.some((rsvpId: string) => 
         rsvpId?.toString() === userId?.toString()
     ) : false;
-    const canRSVP = !isPast;
+    const canRSVP = !isPast && !isCanceled;
 
     return (
         <View className="flex-1 bg-black">
@@ -174,7 +182,15 @@ export default function EventDetailsScreen() {
                                 <Text className="text-3xl md:text-4xl font-bold text-white flex-1 mr-4 leading-tight">
                                     {event.title}
                                 </Text>
-                                {isPast ? (
+                                {isCanceled ? (
+                                    <View className="px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20">
+                                        <Text className="text-red-400 font-bold text-[10px] uppercase tracking-wider">Canceled</Text>
+                                    </View>
+                                ) : isRescheduled ? (
+                                    <View className="px-3 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/20">
+                                        <Text className="text-yellow-400 font-bold text-[10px] uppercase tracking-wider">Rescheduled</Text>
+                                    </View>
+                                ) : isPast ? (
                                     <View className="px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20">
                                         <Text className="text-red-400 font-bold text-[10px] uppercase tracking-wider">Ended</Text>
                                     </View>
@@ -187,12 +203,22 @@ export default function EventDetailsScreen() {
 
                             {/* Date and Location */}
                             <View className="mb-8 space-y-4 bg-white/5 p-5 rounded-2xl border border-white/5">
+                                {isRescheduled && event.rescheduledDate && (
+                                    <View className="mb-3 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                                        <Text className="text-yellow-400 text-xs font-bold mb-1">Event Rescheduled</Text>
+                                        <Text className="text-yellow-300 text-sm">
+                                            New Date: {formatEventDate(event.rescheduledDate)}
+                                        </Text>
+                                    </View>
+                                )}
                                 <View className="flex-row items-center">
                                     <View className="w-10 h-10 rounded-full bg-blue-500/10 items-center justify-center mr-4">
                                         <FontAwesome name="calendar" size={18} color="#60A5FA" />
                                     </View>
                                     <View>
-                                        <Text className="text-gray-400 text-xs uppercase font-bold tracking-wider mb-0.5">Date & Time</Text>
+                                        <Text className="text-gray-400 text-xs uppercase font-bold tracking-wider mb-0.5">
+                                            {isRescheduled ? 'Original Date & Time' : 'Date & Time'}
+                                        </Text>
                                         <Text className="text-white text-base font-semibold">
                                             {formatEventDate(event.date)}
                                         </Text>

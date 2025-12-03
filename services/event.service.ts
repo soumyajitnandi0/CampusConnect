@@ -198,7 +198,7 @@ export class EventService {
   /**
    * Transform API event to Event model
    */
-  private static transformEvent(data: any): Event {
+  static transformEvent(data: any): Event {
     // Clean imageUrl - remove empty strings and whitespace
     let imageUrl = data.imageUrl;
     if (imageUrl && typeof imageUrl === 'string') {
@@ -224,6 +224,16 @@ export class EventService {
       category: data.category,
       imageUrl: imageUrl,
       qrCodeToken: data.qrCodeToken,
+      duration: data.duration ? {
+        days: data.duration.days || 0,
+        hours: data.duration.hours || 0,
+        minutes: data.duration.minutes || 0
+      } : undefined,
+      club: data.club?._id || data.club || undefined,
+      clubName: data.club?.name,
+      status: data.status || 'active',
+      rescheduledDate: data.rescheduledDate ? new Date(data.rescheduledDate) : undefined,
+      cancelReason: data.cancelReason,
       createdAt: new Date(data.createdAt || Date.now()),
       updatedAt: new Date(data.updatedAt || Date.now()),
     };

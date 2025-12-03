@@ -19,5 +19,7 @@ router.put('/:id', auth, eventController.updateEvent);
 router.delete('/:id', auth, eventController.deleteEvent);
 router.post('/:id/rsvp', auth, eventController.rsvpEvent);
 router.delete('/:id/rsvp', auth, eventController.cancelRSVP);
+router.post('/:id/cancel', auth, eventController.cancelEvent);
+router.post('/:id/reschedule', auth, eventController.rescheduleEvent);
 
 module.exports = router;

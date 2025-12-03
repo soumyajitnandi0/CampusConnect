@@ -14,6 +14,20 @@ export interface User {
   updatedAt: Date;
 }
 
+export interface Club {
+  id: string;
+  name: string;
+  description: string;
+  organizer: string; // User ID
+  organizerName?: string;
+  imageUrl?: string;
+  category?: string;
+  followers: string[]; // Array of user IDs
+  followerCount: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface Event {
   id: string;
   title: string;
@@ -22,12 +36,22 @@ export interface Event {
   location: string;
   organizer: string; // User ID
   organizerName?: string;
+  club?: string; // Club ID
+  clubName?: string;
   rsvps: string[]; // Array of user IDs
   checkedIn: string[]; // Array of user IDs
   rsvpCount: number;
   category?: string;
   imageUrl?: string;
   qrCodeToken?: string;
+  duration?: {
+    days: number;
+    hours: number;
+    minutes: number;
+  };
+  status?: 'active' | 'canceled' | 'rescheduled';
+  rescheduledDate?: Date;
+  cancelReason?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -63,6 +87,16 @@ export interface QRCodeData {
   userId: string;
   eventId: string;
   timestamp: number;
+}
+
+export interface Message {
+  id: string;
+  club: string; // Club ID
+  user: string; // User ID
+  userName?: string;
+  userEmail?: string;
+  message: string;
+  createdAt: Date;
 }
 
 export interface EventStats {
