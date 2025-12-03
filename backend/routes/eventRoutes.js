@@ -5,8 +5,13 @@ const auth = require('../middleware/auth');
 
 // Public routes
 router.get('/', eventController.getEvents);
-router.get('/:id', eventController.getEventById);
 router.get('/organizer/:organizerId', eventController.getEventsByOrganizer);
+
+// Protected routes - must come before /:id to avoid route conflicts
+router.get('/my-events', auth, eventController.getMyEvents);
+
+// Public route - must come after /my-events
+router.get('/:id', eventController.getEventById);
 
 // Protected routes
 router.post('/', auth, eventController.createEvent);

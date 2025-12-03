@@ -161,8 +161,19 @@ exports.syncUser = async (req, res) => {
         let user = await User.findOne({ email });
 
         if (user) {
-            // Update existing user role if provided and user doesn't have one
-            if (req.body.role && !user.role) {
+            // Existing user - check role status
+            if (user.role) {
+                // User has a role - this is an existing user signing in
+                if (req.body.role && user.role !== req.body.role) {
+                    // If role is provided and doesn't match, reject
+                    return res.status(400).json({ 
+                        msg: `This account is already registered as a ${user.role}. Please use the correct sign-in button.` 
+                    });
+                }
+                // User has a role and either no role was provided (sign-in) or role matches - proceed
+                // Return the existing user (will be returned at the end)
+            } else if (!user.role && req.body.role) {
+                // User exists but has no role - assign the requested role (from role selection screen)
                 if (!['student', 'organizer'].includes(req.body.role)) {
                     return res.status(400).json({ msg: 'Role must be "student" or "organizer"' });
                 }
@@ -173,13 +184,12 @@ exports.syncUser = async (req, res) => {
                     user.yearSection = req.body.yearSection;
                 }
                 await user.save();
-            }
-            // If user exists but has no role, return error to prompt role selection
-            if (!user.role) {
+            } else if (!user.role && !req.body.role) {
+                // User exists but no role provided - need role selection (sign-up flow)
                 return res.status(400).json({ msg: 'Role is required. Please select a role.' });
             }
         } else {
-            // Create new user - require role in request body for new users
+            // New user - require role in request body for new users
             if (!req.body.role || !['student', 'organizer'].includes(req.body.role)) {
                 return res.status(400).json({ msg: 'Role is required for new users. Must be "student" or "organizer"' });
             }
@@ -191,7 +201,7 @@ exports.syncUser = async (req, res) => {
                 googleId: sub,
             };
 
-            // Add student-specific fields if provided
+            // Add student-specific fields if provided (optional for Google sign-up)
             if (req.body.role === 'student' && req.body.rollNo && req.body.yearSection) {
                 userData.rollNo = req.body.rollNo;
                 userData.yearSection = req.body.yearSection;
@@ -199,6 +209,7 @@ exports.syncUser = async (req, res) => {
 
             user = new User(userData);
             await user.save();
+            console.log(`New ${req.body.role} account created for: ${email}`);
         }
 
         res.json({ 

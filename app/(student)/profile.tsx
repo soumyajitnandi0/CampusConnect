@@ -1,9 +1,12 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { storage } from "../../utils/storage";
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { GlassButton } from '../../components/ui/GlassButton';
+import { GlassContainer } from '../../components/ui/GlassContainer';
+import { ScreenWrapper } from '../../components/ui/ScreenWrapper';
 import { supabase } from '../../services/supabase';
+import { storage } from "../../utils/storage";
 
 export default function ProfileScreen() {
     const [user, setUser] = useState<any>(null);
@@ -32,11 +35,11 @@ export default function ProfileScreen() {
         try {
             // Sign out from Supabase if session exists
             await supabase.auth.signOut();
-            
+
             // Clear local storage
             await storage.removeItem('token');
             await storage.removeItem('user');
-            
+
             // Navigate to login
             router.replace('/(auth)/login');
         } catch (error) {
@@ -50,117 +53,104 @@ export default function ProfileScreen() {
 
     if (loading) {
         return (
-            <View 
-                className="flex-1 justify-center items-center"
-                style={{ backgroundColor: '#F0F7FF' }}
-            >
-                <ActivityIndicator size="large" color="#2563EB" />
-            </View>
+            <ScreenWrapper className="justify-center items-center">
+                <ActivityIndicator size="large" color="#FFFFFF" />
+            </ScreenWrapper>
         );
     }
 
     if (!user) {
         return (
-            <View 
-                className="flex-1 justify-center items-center"
-                style={{ backgroundColor: '#F0F7FF' }}
-            >
-                <Text className="text-gray-600">No user data</Text>
-            </View>
+            <ScreenWrapper className="justify-center items-center">
+                <Text className="text-gray-400">No user data</Text>
+            </ScreenWrapper>
         );
     }
 
     return (
-        <ScrollView 
-            className="flex-1"
-            style={{ backgroundColor: '#F0F7FF' }}
-            contentContainerStyle={{ flexGrow: 1 }}
-        >
-            <View className="p-6 pt-16">
-                {/* Profile Header */}
-                <View className="items-center mb-8">
-                    <View 
-                        className="w-28 h-28 rounded-full justify-center items-center mb-4"
-                        style={{
-                            backgroundColor: '#2563EB',
-                            shadowColor: '#2563EB',
-                            shadowOffset: { width: 0, height: 4 },
-                            shadowOpacity: 0.3,
-                            shadowRadius: 8,
-                            elevation: 8,
-                        }}
-                    >
-                        <Text className="text-5xl text-white font-bold">
-                            {user.name.charAt(0).toUpperCase()}
-                        </Text>
+        <ScreenWrapper>
+            <ScrollView
+                className="flex-1"
+                contentContainerStyle={{ flexGrow: 1 }}
+            >
+                <View className="p-6 pt-16 w-full max-w-md self-center">
+                    {/* Profile Header */}
+                    <View className="items-center mb-10">
+                        <View className="relative">
+                            <GlassContainer className="w-32 h-32 rounded-full justify-center items-center mb-4 p-0 border-2 border-white/20" intensity={40}>
+                                <Text className="text-6xl text-white font-bold">
+                                    {user.name.charAt(0).toUpperCase()}
+                                </Text>
+                            </GlassContainer>
+                            <View className="absolute bottom-4 right-0 w-8 h-8 bg-green-500 rounded-full border-4 border-black" />
+                        </View>
+
+                        <Text className="text-3xl font-bold text-white mb-1 text-center">{user.name}</Text>
+                        <Text className="text-gray-400 mb-3 text-center text-base">{user.email}</Text>
+
+                        <View className="px-6 py-1.5 rounded-full bg-white/10 border border-white/20">
+                            <Text className="text-white font-semibold text-sm capitalize tracking-wide">
+                                {user.role}
+                            </Text>
+                        </View>
                     </View>
-                    <Text className="text-3xl font-bold text-gray-900 mb-1">{user.name}</Text>
-                    <Text className="text-gray-600 mb-2">{user.email}</Text>
-                    <View 
-                        className="px-4 py-1 rounded-full mt-1"
-                        style={{ backgroundColor: '#EEF2FF' }}
-                    >
-                        <Text className="text-blue-600 font-semibold text-sm capitalize">
-                            {user.role}
-                        </Text>
-                    </View>
+
+                    {/* Student Details Card */}
+                    {user.role === 'student' && user.rollNo && (
+                        <GlassContainer className="mb-8 p-0 overflow-hidden" intensity={25}>
+                            <View className="p-5 border-b border-white/5 bg-white/5">
+                                <View className="flex-row items-center">
+                                    <View className="w-10 h-10 rounded-full justify-center items-center mr-4 bg-blue-500/20">
+                                        <FontAwesome name="graduation-cap" size={20} color="#60A5FA" />
+                                    </View>
+                                    <View>
+                                        <Text className="text-lg font-bold text-white">Academic Details</Text>
+                                        <Text className="text-gray-400 text-xs">Student Information</Text>
+                                    </View>
+                                </View>
+                            </View>
+
+                            <View className="p-5 space-y-5">
+                                <View className="flex-row items-center justify-between">
+                                    <View className="flex-row items-center">
+                                        <View className="w-8 items-center">
+                                            <FontAwesome name="id-card" size={16} color="#9CA3AF" />
+                                        </View>
+                                        <Text className="text-gray-300 ml-2">Roll Number</Text>
+                                    </View>
+                                    <Text className="text-white font-bold text-base">
+                                        {user.rollNo || 'Not set'}
+                                    </Text>
+                                </View>
+
+                                <View className="h-[1px] bg-white/5" />
+
+                                <View className="flex-row items-center justify-between">
+                                    <View className="flex-row items-center">
+                                        <View className="w-8 items-center">
+                                            <FontAwesome name="calendar" size={16} color="#9CA3AF" />
+                                        </View>
+                                        <Text className="text-gray-300 ml-2">Year & Section</Text>
+                                    </View>
+                                    <Text className="text-white font-bold text-base">
+                                        {user.yearSection || 'Not set'}
+                                    </Text>
+                                </View>
+                            </View>
+                        </GlassContainer>
+                    )}
+
+                    {/* Logout Button */}
+                    <GlassButton
+                        title="Sign Out"
+                        onPress={handleLogout}
+                        variant="outline"
+                        className="mt-auto mb-6 border-red-500/30 bg-red-500/5 active:bg-red-500/20"
+                        textClassName="text-red-400 font-bold"
+                        icon={<FontAwesome name="sign-out" size={18} color="#F87171" style={{ marginRight: 10 }} />}
+                    />
                 </View>
-
-                {/* Student Details Card */}
-                {user.role === 'student' && user.rollNo && (
-                    <View 
-                        className="bg-white p-5 rounded-2xl mb-6"
-                        style={{
-                            shadowColor: '#000',
-                            shadowOffset: { width: 0, height: 2 },
-                            shadowOpacity: 0.1,
-                            shadowRadius: 8,
-                            elevation: 4,
-                        }}
-                    >
-                        <View className="flex-row items-center mb-4">
-                            <View 
-                                className="w-10 h-10 rounded-full justify-center items-center mr-3"
-                                style={{ backgroundColor: '#DBEAFE' }}
-                            >
-                                <FontAwesome name="graduation-cap" size={20} color="#2563EB" />
-                            </View>
-                            <Text className="text-lg font-bold text-gray-900">Student Details</Text>
-                        </View>
-                        <View className="border-t border-gray-100 pt-4 space-y-3">
-                            <View className="flex-row items-center">
-                                <FontAwesome name="id-card" size={16} color="#6B7280" />
-                                <Text className="text-gray-600 ml-3">Roll No:</Text>
-                                <Text className="text-gray-900 font-semibold ml-2">{user.rollNo}</Text>
-                            </View>
-                            <View className="flex-row items-center">
-                                <FontAwesome name="calendar" size={16} color="#6B7280" />
-                                <Text className="text-gray-600 ml-3">Year/Section:</Text>
-                                <Text className="text-gray-900 font-semibold ml-2">{user.yearSection}</Text>
-                            </View>
-                        </View>
-                    </View>
-                )}
-
-                {/* Logout Button */}
-                <TouchableOpacity
-                    className="rounded-xl items-center justify-center py-4 mt-auto mb-6"
-                    onPress={handleLogout}
-                    style={{
-                        backgroundColor: '#EF4444',
-                        shadowColor: '#EF4444',
-                        shadowOffset: { width: 0, height: 4 },
-                        shadowOpacity: 0.3,
-                        shadowRadius: 8,
-                        elevation: 8,
-                    }}
-                >
-                    <View className="flex-row items-center">
-                        <FontAwesome name="sign-out" size={18} color="#FFFFFF" />
-                        <Text className="text-white font-bold text-base ml-2">Logout</Text>
-                    </View>
-                </TouchableOpacity>
-            </View>
-        </ScrollView>
+            </ScrollView>
+        </ScreenWrapper>
     );
 }

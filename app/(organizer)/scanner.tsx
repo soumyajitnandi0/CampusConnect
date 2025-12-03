@@ -3,6 +3,9 @@ import { Camera, CameraView } from "expo-camera";
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { GlassButton } from '../../components/ui/GlassButton';
+import { GlassContainer } from '../../components/ui/GlassContainer';
+import { ScreenWrapper } from '../../components/ui/ScreenWrapper';
 import { CheckInService } from '../../services/checkin.service';
 import { decodeQRData, isQRCodeExpired } from '../../utils/qr-code.utils';
 
@@ -24,24 +27,26 @@ export default function OrganizerScannerScreen() {
 
     const handleBarCodeScanned = async ({ type, data }: { type: string, data: string }) => {
         if (scanned || processing) return;
-        
+
         setScanned(true);
         setProcessing(true);
-        
+
         try {
             console.log('Scanned QR data:', data);
-            
+
             // Decode QR data
             const qrData = decodeQRData(data);
-            
+
             if (!qrData) {
                 Alert.alert(
                     'Invalid QR Code',
                     'This QR code is not valid. Please scan a student\'s check-in QR code.',
-                    [{ text: 'OK', onPress: () => {
-                        setScanned(false);
-                        setProcessing(false);
-                    }}]
+                    [{
+                        text: 'OK', onPress: () => {
+                            setScanned(false);
+                            setProcessing(false);
+                        }
+                    }]
                 );
                 return;
             }
@@ -53,10 +58,12 @@ export default function OrganizerScannerScreen() {
                 Alert.alert(
                     'Expired QR Code',
                     'This QR code has expired (older than 24 hours). Please ask the student to generate a new one.',
-                    [{ text: 'OK', onPress: () => {
-                        setScanned(false);
-                        setProcessing(false);
-                    }}]
+                    [{
+                        text: 'OK', onPress: () => {
+                            setScanned(false);
+                            setProcessing(false);
+                        }
+                    }]
                 );
                 return;
             }
@@ -66,10 +73,12 @@ export default function OrganizerScannerScreen() {
                 Alert.alert(
                     'Wrong Event',
                     'This QR code is for a different event. Please scan the correct QR code for this event.',
-                    [{ text: 'OK', onPress: () => {
-                        setScanned(false);
-                        setProcessing(false);
-                    }}]
+                    [{
+                        text: 'OK', onPress: () => {
+                            setScanned(false);
+                            setProcessing(false);
+                        }
+                    }]
                 );
                 return;
             }
@@ -81,10 +90,12 @@ export default function OrganizerScannerScreen() {
                 Alert.alert(
                     'Error',
                     'Event ID not found in QR code.',
-                    [{ text: 'OK', onPress: () => {
-                        setScanned(false);
-                        setProcessing(false);
-                    }}]
+                    [{
+                        text: 'OK', onPress: () => {
+                            setScanned(false);
+                            setProcessing(false);
+                        }
+                    }]
                 );
                 return;
             }
@@ -93,10 +104,12 @@ export default function OrganizerScannerScreen() {
                 Alert.alert(
                     'Error',
                     'User ID not found in QR code.',
-                    [{ text: 'OK', onPress: () => {
-                        setScanned(false);
-                        setProcessing(false);
-                    }}]
+                    [{
+                        text: 'OK', onPress: () => {
+                            setScanned(false);
+                            setProcessing(false);
+                        }
+                    }]
                 );
                 return;
             }
@@ -106,12 +119,12 @@ export default function OrganizerScannerScreen() {
             // Check in user
             try {
                 await CheckInService.checkInUser(targetEventId, qrData.userId, qrData);
-                
+
                 Alert.alert(
                     'Success! ✓',
                     'Student has been checked in successfully.',
-                    [{ 
-                        text: 'OK', 
+                    [{
+                        text: 'OK',
                         onPress: () => {
                             setScanned(false);
                             setProcessing(false);
@@ -119,7 +132,7 @@ export default function OrganizerScannerScreen() {
                             setTimeout(() => {
                                 setScanned(false);
                             }, 1000);
-                        } 
+                        }
                     }]
                 );
             } catch (checkInError: any) {
@@ -131,15 +144,15 @@ export default function OrganizerScannerScreen() {
                     Alert.alert(
                         'Already Checked In ✓',
                         'This student has already been checked in for this event.',
-                        [{ 
-                            text: 'OK', 
+                        [{
+                            text: 'OK',
                             onPress: () => {
                                 setScanned(false);
                                 setProcessing(false);
                                 setTimeout(() => {
                                     setScanned(false);
                                 }, 1000);
-                            } 
+                            }
                         }]
                     );
                 } else {
@@ -153,31 +166,35 @@ export default function OrganizerScannerScreen() {
             Alert.alert(
                 'Check-in Failed',
                 errorMessage,
-                [{ text: 'OK', onPress: () => {
-                    setScanned(false);
-                    setProcessing(false);
-                }}]
+                [{
+                    text: 'OK', onPress: () => {
+                        setScanned(false);
+                        setProcessing(false);
+                    }
+                }]
             );
         }
     };
 
     if (hasPermission === null) {
         return (
-            <View style={[styles.container, styles.centerContent]}>
-                <Text style={styles.text}>Requesting camera permission...</Text>
-            </View>
+            <ScreenWrapper className="justify-center items-center">
+                <Text className="text-white">Requesting camera permission...</Text>
+            </ScreenWrapper>
         );
     }
-    
+
     if (hasPermission === false) {
         return (
-            <View style={[styles.container, styles.centerContent]}>
-                <FontAwesome name="camera" size={48} color="#9CA3AF" />
-                <Text style={[styles.text, { marginTop: 16 }]}>Camera access denied</Text>
-                <Text style={[styles.text, { fontSize: 14, color: '#6B7280', marginTop: 8 }]}>
-                    Please enable camera permissions in settings
-                </Text>
-            </View>
+            <ScreenWrapper className="justify-center items-center p-6">
+                <GlassContainer className="items-center p-8">
+                    <FontAwesome name="camera" size={48} color="#9CA3AF" />
+                    <Text className="text-white text-lg font-bold mt-4">Camera access denied</Text>
+                    <Text className="text-gray-400 text-center mt-2">
+                        Please enable camera permissions in settings
+                    </Text>
+                </GlassContainer>
+            </ScreenWrapper>
         );
     }
 
@@ -204,27 +221,28 @@ export default function OrganizerScannerScreen() {
                     <View style={[styles.corner, styles.bottomLeft]} />
                     <View style={[styles.corner, styles.bottomRight]} />
                 </View>
-                <Text style={styles.instructionText}>
-                    Scan student QR code to check in
-                </Text>
+                <GlassContainer className="mt-10 px-6 py-3 rounded-full" intensity={30}>
+                    <Text className="text-white font-semibold text-center">
+                        Scan student QR code to check in
+                    </Text>
+                </GlassContainer>
             </View>
             {scanned && (
                 <View style={styles.scannedOverlay}>
                     {processing ? (
-                        <View style={styles.processingContainer}>
+                        <GlassContainer className="items-center p-6">
                             <ActivityIndicator size="large" color="#FFFFFF" />
-                            <Text style={styles.processingText}>Processing check-in...</Text>
-                        </View>
+                            <Text className="text-white font-semibold mt-4">Processing check-in...</Text>
+                        </GlassContainer>
                     ) : (
-                        <TouchableOpacity
-                            style={styles.scanAgainButton}
+                        <GlassButton
+                            title="Tap to Scan Again"
                             onPress={() => {
                                 setScanned(false);
                                 setProcessing(false);
                             }}
-                        >
-                            <Text style={styles.scanAgainText}>Tap to Scan Again</Text>
-                        </TouchableOpacity>
+                            className="bg-purple-600/80 border-purple-400/50"
+                        />
                     )}
                 </View>
             )}
@@ -235,16 +253,7 @@ export default function OrganizerScannerScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-    },
-    centerContent: {
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#F9FAFB',
-    },
-    text: {
-        fontSize: 16,
-        color: '#111827',
-        fontWeight: '500',
+        backgroundColor: 'black',
     },
     overlay: {
         ...StyleSheet.absoluteFillObject,
@@ -259,20 +268,22 @@ const styles = StyleSheet.create({
         width: 44,
         height: 44,
         borderRadius: 22,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
         justifyContent: 'center',
         alignItems: 'center',
+        zIndex: 10,
     },
     scanArea: {
         width: 250,
         height: 250,
         position: 'relative',
+        backgroundColor: 'transparent',
     },
     corner: {
         position: 'absolute',
         width: 30,
         height: 30,
-        borderColor: '#9333EA',
+        borderColor: '#A855F7',
         borderWidth: 3,
     },
     topLeft: {
@@ -299,50 +310,12 @@ const styles = StyleSheet.create({
         borderLeftWidth: 0,
         borderTopWidth: 0,
     },
-    instructionText: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: '600',
-        marginTop: 40,
-        textAlign: 'center',
-    },
     scannedOverlay: {
         ...StyleSheet.absoluteFillObject,
         backgroundColor: 'rgba(0, 0, 0, 0.7)',
         justifyContent: 'center',
         alignItems: 'center',
-    },
-    scanAgainButton: {
-        backgroundColor: '#9333EA',
-        paddingHorizontal: 24,
-        paddingVertical: 12,
-        borderRadius: 12,
-    },
-    scanAgainText: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    backButton: {
-        backgroundColor: '#9333EA',
-        paddingHorizontal: 24,
-        paddingVertical: 12,
-        borderRadius: 12,
-        marginTop: 20,
-    },
-    backButtonText: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    processingContainer: {
-        alignItems: 'center',
-    },
-    processingText: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: '600',
-        marginTop: 16,
+        padding: 20,
     },
 });
 

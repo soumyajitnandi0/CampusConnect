@@ -6,8 +6,11 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        primary: '#4ADE80', // Green accent
-        secondary: '#F3F4F6', // Soft gray
+        primary: '#FFFFFF', // White for primary actions
+        secondary: '#111111', // Dark gray for secondary backgrounds
+        'glass-black': 'rgba(0, 0, 0, 0.7)',
+        'glass-white': 'rgba(255, 255, 255, 0.1)',
+        'glass-border': 'rgba(255, 255, 255, 0.2)',
       }
     },
   },

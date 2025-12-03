@@ -54,7 +54,7 @@ exports.getEventById = async (req, res) => {
     }
 };
 
-// Get events by organizer
+// Get events by organizer (public route - by organizerId)
 exports.getEventsByOrganizer = async (req, res) => {
     try {
         const organizerId = req.params.organizerId;
@@ -79,6 +79,55 @@ exports.getEventsByOrganizer = async (req, res) => {
     } catch (err) {
         console.error(err.message);
         res.status(500).json({ msg: 'Server Error' });
+    }
+};
+
+// Get events for authenticated organizer (their own events)
+exports.getMyEvents = async (req, res) => {
+    try {
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ msg: 'Authentication required' });
+        }
+
+        // Verify user is organizer
+        const user = await User.findById(req.user.id);
+        if (!user) {
+            return res.status(404).json({ msg: 'User not found' });
+        }
+        
+        if (user.role !== 'organizer') {
+            return res.status(403).json({ msg: 'Only organizers can access this endpoint' });
+        }
+
+        // Use the same pattern as getEventsByOrganizer
+        const organizerId = req.user.id;
+        const events = await Event.find({ organizer: organizerId })
+            .populate('organizer', 'name email')
+            .sort({ date: 1 });
+        
+        const eventsWithRSVPs = await Promise.all(
+            events.map(async (event) => {
+                const rsvps = await RSVP.find({ event: event._id, status: 'going' });
+                const checkedIn = await RSVP.find({ event: event._id, attended: true });
+                
+                return {
+                    ...event.toObject(),
+                    rsvps: rsvps.map(r => r.user.toString()),
+                    checkedIn: checkedIn.map(r => r.user.toString()),
+                };
+            })
+        );
+        
+        res.json(eventsWithRSVPs);
+    } catch (err) {
+        console.error('getMyEvents Error:', err);
+        console.error('Error details:', {
+            message: err.message,
+            stack: err.stack,
+            userId: req.user?.id,
+            userObject: req.user
+        });
+        res.status(500).json({ msg: err.message || 'Server Error' });
     }
 };
 

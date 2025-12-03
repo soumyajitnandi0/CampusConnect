@@ -1,5 +1,5 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -42,7 +42,7 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={DarkTheme}>
       <NetworkProvider>
         <AuthProvider>
           <EventsProvider>
@@ -52,8 +52,9 @@ export default function RootLayout() {
               <Stack.Screen name="(student)" options={{ headerShown: false }} />
               <Stack.Screen name="(organizer)" options={{ headerShown: false }} />
               <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+              <Stack.Screen name="event/[id]" options={{ headerShown: false }} />
             </Stack>
-            <StatusBar style="auto" />
+            <StatusBar style="light" />
           </EventsProvider>
         </AuthProvider>
       </NetworkProvider>

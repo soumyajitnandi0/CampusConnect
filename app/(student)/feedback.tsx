@@ -1,17 +1,24 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { storage } from "../../utils/storage";
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Text, TouchableOpacity, View } from 'react-native';
+import { GlassButton } from '../../components/ui/GlassButton';
+import { GlassContainer } from '../../components/ui/GlassContainer';
+import { GlassInput } from '../../components/ui/GlassInput';
+import { ScreenWrapper } from '../../components/ui/ScreenWrapper';
 import api from '../../services/api';
+import { storage } from "../../utils/storage";
 
 export default function FeedbackScreen() {
     const { eventId, eventTitle } = useLocalSearchParams();
     const [rating, setRating] = useState(5);
     const [comment, setComment] = useState('');
+    const [submitting, setSubmitting] = useState(false);
     const router = useRouter();
 
     const handleSubmit = async () => {
+        if (submitting) return;
+        setSubmitting(true);
         try {
             const token = await storage.getItem('token');
             await api.post('/feedback', {
@@ -26,49 +33,54 @@ export default function FeedbackScreen() {
             router.back();
         } catch (err: any) {
             Alert.alert('Error', err.response?.data?.msg || 'Failed to submit feedback');
+        } finally {
+            setSubmitting(false);
         }
     };
 
     return (
-        <View className="flex-1 bg-white p-6 justify-center">
-            <Text className="text-2xl font-bold mb-2 text-center">Rate Event</Text>
-            <Text className="text-gray-600 text-center mb-8">{eventTitle}</Text>
+        <ScreenWrapper className="justify-center p-6">
+            <GlassContainer className="p-6 w-full">
+                <Text className="text-2xl font-bold mb-2 text-center text-white">Rate Event</Text>
+                <Text className="text-gray-300 text-center mb-8">{eventTitle}</Text>
 
-            <View className="flex-row justify-center mb-8">
-                {[1, 2, 3, 4, 5].map((star) => (
-                    <TouchableOpacity key={star} onPress={() => setRating(star)} className="mx-2">
-                        <FontAwesome
-                            name={star <= rating ? "star" : "star-o"}
-                            size={40}
-                            color="#fbbf24"
-                        />
-                    </TouchableOpacity>
-                ))}
-            </View>
+                <View className="flex-row justify-center mb-8">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                        <TouchableOpacity key={star} onPress={() => setRating(star)} className="mx-2">
+                            <FontAwesome
+                                name={star <= rating ? "star" : "star-o"}
+                                size={40}
+                                color={star <= rating ? "#FBBF24" : "#4B5563"}
+                            />
+                        </TouchableOpacity>
+                    ))}
+                </View>
 
-            <Text className="mb-2 font-semibold">Comments (Optional)</Text>
-            <TextInput
-                className="border border-gray-300 rounded-lg p-3 mb-8 h-32"
-                value={comment}
-                onChangeText={setComment}
-                placeholder="Share your experience..."
-                multiline
-                textAlignVertical="top"
-            />
+                <GlassInput
+                    label="Comments (Optional)"
+                    placeholder="Share your experience..."
+                    value={comment}
+                    onChangeText={setComment}
+                    multiline
+                    numberOfLines={4}
+                    className="h-32 text-top"
+                    containerClassName="mb-8"
+                />
 
-            <TouchableOpacity
-                className="bg-blue-600 p-4 rounded-lg items-center"
-                onPress={handleSubmit}
-            >
-                <Text className="text-white font-bold text-lg">Submit Feedback</Text>
-            </TouchableOpacity>
+                <GlassButton
+                    title="Submit Feedback"
+                    onPress={handleSubmit}
+                    loading={submitting}
+                    className="mb-4"
+                />
 
-            <TouchableOpacity
-                className="mt-4 p-4 items-center"
-                onPress={() => router.back()}
-            >
-                <Text className="text-gray-500">Cancel</Text>
-            </TouchableOpacity>
-        </View>
+                <GlassButton
+                    title="Cancel"
+                    onPress={() => router.back()}
+                    variant="outline"
+                    className="border-gray-500"
+                />
+            </GlassContainer>
+        </ScreenWrapper>
     );
 }

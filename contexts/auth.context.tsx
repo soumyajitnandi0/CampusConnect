@@ -27,7 +27,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen to Supabase auth changes (only for OAuth users)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session) {
-        await syncUser(session.access_token);
+        try {
+          await syncUser(session.access_token);
+        } catch (error: any) {
+          // If sync fails with 400, user needs role selection
+          // Don't clear user state - let login screen handle redirect
+          if (error.response?.status === 400) {
+            console.log('User needs role selection, will be handled by login flow');
+            // Keep the token so user can select role
+            return;
+          }
+          // For other errors, clear state
+          console.error('Auth state change error:', error);
+          setUser(null);
+          await storage.multiRemove(['token', 'user']);
+        }
       } else if (event === 'SIGNED_OUT') {
         // Only clear on explicit sign out, not on initial load
         setUser(null);
@@ -100,6 +114,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await sessionManager.saveLoginTimestamp();
     } catch (error: any) {
       console.error('Error syncing user:', error);
+      
+      // If 400 error, it means user needs to select role - don't throw, just log
+      // The login screen will handle redirecting to role selection
+      if (error.response?.status === 400) {
+        const errorMsg = error.response?.data?.msg || 'Role selection required';
+        console.log('User needs role selection:', errorMsg);
+        // Don't throw - let the login flow handle it
+        return;
+      }
+      
       throw error;
     }
   };

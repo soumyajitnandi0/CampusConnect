@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator } from 'react-native';
+import { ScreenWrapper } from '../components/ui/ScreenWrapper';
 import { storage } from '../utils/storage';
 
 export default function Index() {
@@ -20,11 +21,11 @@ export default function Index() {
             if (token && userStr) {
                 try {
                     const user = JSON.parse(userStr);
-                    
+
                     // Check if session is still valid (30 days)
                     const { sessionManager } = await import('../utils/storage');
                     const isValid = await sessionManager.isSessionValid();
-                    
+
                     if (!isValid) {
                         // Check if there's no timestamp at all (old login before session tracking)
                         const timestampStr = await storage.getItem('session_timestamp');
@@ -42,7 +43,7 @@ export default function Index() {
                             return;
                         }
                     }
-                    
+
                     // Session is valid and user has role, route accordingly
                     if (user && user.role) {
                         if (user.role === 'organizer') {
@@ -78,9 +79,9 @@ export default function Index() {
 
     if (loading) {
         return (
-            <View className="flex-1 justify-center items-center bg-white">
-                <ActivityIndicator size="large" color="#2563eb" />
-            </View>
+            <ScreenWrapper className="justify-center items-center">
+                <ActivityIndicator size="large" color="#FFFFFF" />
+            </ScreenWrapper>
         );
     }
 

@@ -117,7 +117,7 @@ export class EventService {
   }
 
   /**
-   * Get events created by a specific organizer
+   * Get events created by a specific organizer (public)
    */
   static async getEventsByCreator(organizerId: string): Promise<Event[]> {
     try {
@@ -128,6 +128,25 @@ export class EventService {
       return response.data.map((event: any) => this.transformEvent(event));
     } catch (error: any) {
       throw new Error(error.response?.data?.msg || 'Failed to fetch events');
+    }
+  }
+
+  /**
+   * Get events for the authenticated organizer (their own events)
+   */
+  static async getMyEvents(): Promise<Event[]> {
+    try {
+      const token = await storage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+
+      const response = await api.get('/events/my-events', {
+        headers: { 'x-auth-token': token },
+      });
+      return response.data.map((event: any) => this.transformEvent(event));
+    } catch (error: any) {
+      throw new Error(error.response?.data?.msg || 'Failed to fetch my events');
     }
   }
 

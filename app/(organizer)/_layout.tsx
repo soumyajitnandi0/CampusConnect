@@ -1,30 +1,46 @@
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { Platform } from 'react-native';
+import GlassTabBarBackground from '../../components/ui/GlassTabBarBackground';
 
 function TabBarIcon(props: {
     name: React.ComponentProps<typeof FontAwesome>['name'];
     color: string;
 }) {
-    return <FontAwesome size={28} style={{ marginBottom: -3 }} {...props} />;
+    return <FontAwesome size={24} style={{ marginBottom: -3 }} {...props} />;
 }
 
 export default function OrganizerLayout() {
-    const colorScheme = useColorScheme();
-
     return (
         <Tabs
             screenOptions={{
-                tabBarActiveTintColor: '#2563eb', // blue-600
+                tabBarActiveTintColor: '#FFFFFF',
+                tabBarInactiveTintColor: '#9CA3AF',
                 headerShown: false,
+                tabBarBackground: () => <GlassTabBarBackground />,
                 tabBarStyle: Platform.select({
                     ios: {
                         position: 'absolute',
+                        backgroundColor: 'transparent',
+                        borderTopWidth: 0,
+                        elevation: 0,
+                        height: 85,
                     },
-                    default: {},
+                    default: {
+                        position: 'absolute',
+                        backgroundColor: 'transparent',
+                        borderTopWidth: 0,
+                        elevation: 0,
+                        height: 65,
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                    },
                 }),
+                tabBarItemStyle: {
+                    paddingTop: 8,
+                },
             }}>
             <Tabs.Screen
                 name="index"

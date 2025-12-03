@@ -1,7 +1,10 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Camera, CameraView } from "expo-camera";
 import React, { useEffect, useState } from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
+import { GlassButton } from '../../components/ui/GlassButton';
+import { GlassContainer } from '../../components/ui/GlassContainer';
+import { ScreenWrapper } from '../../components/ui/ScreenWrapper';
 import { useAuth } from '../../contexts/auth.context';
 import { CheckInService } from '../../services/checkin.service';
 import { decodeQRData } from '../../utils/qr-code.utils';
@@ -22,12 +25,12 @@ export default function ScanScreen() {
 
     const handleBarCodeScanned = async ({ type, data }: { type: string, data: string }) => {
         if (scanned || !user) return;
-        
+
         setScanned(true);
         try {
             // Try to decode QR data
             const qrData = decodeQRData(data);
-            
+
             if (!qrData) {
                 Alert.alert('Error', 'Invalid QR code format');
                 setScanned(false);
@@ -46,21 +49,23 @@ export default function ScanScreen() {
 
     if (hasPermission === null) {
         return (
-            <View style={[styles.container, styles.centerContent]}>
-                <Text style={styles.text}>Requesting camera permission...</Text>
-            </View>
+            <ScreenWrapper className="justify-center items-center">
+                <Text className="text-white">Requesting camera permission...</Text>
+            </ScreenWrapper>
         );
     }
-    
+
     if (hasPermission === false) {
         return (
-            <View style={[styles.container, styles.centerContent]}>
-                <FontAwesome name="camera" size={48} color="#9CA3AF" />
-                <Text style={[styles.text, { marginTop: 16 }]}>Camera access denied</Text>
-                <Text style={[styles.text, { fontSize: 14, color: '#6B7280', marginTop: 8 }]}>
-                    Please enable camera permissions in settings
-                </Text>
-            </View>
+            <ScreenWrapper className="justify-center items-center p-6">
+                <GlassContainer className="items-center p-8">
+                    <FontAwesome name="camera" size={48} color="#9CA3AF" />
+                    <Text className="text-white text-lg font-bold mt-4">Camera access denied</Text>
+                    <Text className="text-gray-400 text-center mt-2">
+                        Please enable camera permissions in settings
+                    </Text>
+                </GlassContainer>
+            </ScreenWrapper>
         );
     }
 
@@ -80,18 +85,19 @@ export default function ScanScreen() {
                     <View style={[styles.corner, styles.bottomLeft]} />
                     <View style={[styles.corner, styles.bottomRight]} />
                 </View>
-                <Text style={styles.instructionText}>
-                    Position QR code within the frame
-                </Text>
+                <GlassContainer className="mt-10 px-6 py-3 rounded-full" intensity={30}>
+                    <Text className="text-white font-semibold text-center">
+                        Position QR code within the frame
+                    </Text>
+                </GlassContainer>
             </View>
             {scanned && (
                 <View style={styles.scannedOverlay}>
-                    <TouchableOpacity
-                        style={styles.scanAgainButton}
+                    <GlassButton
+                        title="Tap to Scan Again"
                         onPress={() => setScanned(false)}
-                    >
-                        <Text style={styles.scanAgainText}>Tap to Scan Again</Text>
-                    </TouchableOpacity>
+                        className="bg-blue-600/80 border-blue-400/50"
+                    />
                 </View>
             )}
         </View>
@@ -101,16 +107,7 @@ export default function ScanScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-    },
-    centerContent: {
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#F9FAFB',
-    },
-    text: {
-        fontSize: 16,
-        color: '#111827',
-        fontWeight: '500',
+        backgroundColor: 'black',
     },
     overlay: {
         ...StyleSheet.absoluteFillObject,
@@ -122,12 +119,13 @@ const styles = StyleSheet.create({
         width: 250,
         height: 250,
         position: 'relative',
+        backgroundColor: 'transparent',
     },
     corner: {
         position: 'absolute',
         width: 30,
         height: 30,
-        borderColor: '#2563EB',
+        borderColor: '#60A5FA',
         borderWidth: 3,
     },
     topLeft: {
@@ -154,28 +152,11 @@ const styles = StyleSheet.create({
         borderLeftWidth: 0,
         borderTopWidth: 0,
     },
-    instructionText: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: '600',
-        marginTop: 40,
-        textAlign: 'center',
-    },
     scannedOverlay: {
         ...StyleSheet.absoluteFillObject,
         backgroundColor: 'rgba(0, 0, 0, 0.7)',
         justifyContent: 'center',
         alignItems: 'center',
-    },
-    scanAgainButton: {
-        backgroundColor: '#2563EB',
-        paddingHorizontal: 24,
-        paddingVertical: 12,
-        borderRadius: 12,
-    },
-    scanAgainText: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: '600',
+        padding: 20,
     },
 });
