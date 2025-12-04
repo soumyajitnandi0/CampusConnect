@@ -21,6 +21,30 @@ export const unstable_settings = {
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
+// Suppress Expo Updates errors at the native level - set up immediately
+if (typeof ErrorUtils !== 'undefined') {
+  const originalHandler = ErrorUtils.getGlobalHandler();
+  ErrorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
+    // Suppress Expo Updates errors silently - check multiple patterns
+    const errorMessage = error?.message || error?.toString() || '';
+    if (
+      errorMessage.includes('Failed to download remote update') ||
+      errorMessage.includes('java.io.IOException') ||
+      errorMessage.includes('remote update') ||
+      errorMessage.includes('IOException') ||
+      (errorMessage.includes('download') && errorMessage.includes('update'))
+    ) {
+      // Silently suppress - don't crash the app
+      console.warn('[Suppressed] Expo Updates error:', errorMessage);
+      return;
+    }
+    // Handle other errors normally
+    if (originalHandler) {
+      originalHandler(error, isFatal);
+    }
+  });
+}
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [loaded, error] = useFonts({
@@ -28,7 +52,19 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (error) throw error;
+    if (error) {
+      // Suppress font loading errors related to updates
+      const errorMessage = error?.message || error?.toString() || '';
+      if (
+        errorMessage.includes('Failed to download') ||
+        errorMessage.includes('IOException') ||
+        errorMessage.includes('remote update')
+      ) {
+        console.warn('[Suppressed] Font loading error related to updates:', errorMessage);
+        return;
+      }
+      throw error;
+    }
   }, [error]);
 
   useEffect(() => {

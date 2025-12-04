@@ -1,10 +1,11 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, Text, TouchableOpacity, View } from 'react-native';
-import { GlassContainer } from '../../components/ui/GlassContainer';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { OrganizerClubCard } from '../../components/ui/OrganizerClubCard';
+import { OrganizerHeaderCard } from '../../components/ui/OrganizerHeaderCard';
 import { ScreenWrapper } from '../../components/ui/ScreenWrapper';
+import { Theme } from '../../constants/theme';
 import { ClubService } from '../../services/club.service';
 import { Club } from '../../types/models';
 
@@ -36,68 +37,34 @@ export default function ClubsScreen() {
     };
 
     const renderClub = ({ item }: { item: Club }) => (
-        <TouchableOpacity
+        <OrganizerClubCard
+            club={item}
             onPress={() => router.push({
                 pathname: '/(organizer)/club-details',
                 params: { clubId: item.id }
             })}
-            className="px-6 mb-4"
-        >
-            <GlassContainer className="p-4" intensity={20}>
-                <View className="flex-row items-center">
-                    {item.imageUrl ? (
-                        <Image
-                            source={{ uri: item.imageUrl }}
-                            style={{ width: 60, height: 60, borderRadius: 12 }}
-                            contentFit="cover"
-                        />
-                    ) : (
-                        <View className="w-15 h-15 rounded-xl bg-purple-500/20 items-center justify-center">
-                            <FontAwesome name="group" size={24} color="#A855F7" />
-                        </View>
-                    )}
-                    <View className="flex-1 ml-4">
-                        <Text className="text-white font-bold text-lg mb-1">{item.name}</Text>
-                        <Text className="text-gray-400 text-sm" numberOfLines={2}>
-                            {item.description}
-                        </Text>
-                        <View className="flex-row items-center mt-2">
-                            <FontAwesome name="users" size={12} color="#9CA3AF" />
-                            <Text className="text-gray-500 text-xs ml-1">
-                                {item.followerCount} {item.followerCount === 1 ? 'follower' : 'followers'}
-                            </Text>
-                        </View>
-                    </View>
-                    <FontAwesome name="chevron-right" size={16} color="#9CA3AF" />
-                </View>
-            </GlassContainer>
-        </TouchableOpacity>
+        />
     );
 
     if (loading) {
         return (
-            <ScreenWrapper className="justify-center items-center">
-                <ActivityIndicator size="large" color="#FFFFFF" />
+            <ScreenWrapper style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={Theme.colors.accent.purpleLight} />
             </ScreenWrapper>
         );
     }
 
     return (
         <ScreenWrapper>
-            <View className="px-6 pt-4 pb-4">
-                <GlassContainer className="flex-row items-center justify-between p-6" intensity={20}>
-                    <View>
-                        <Text className="text-3xl font-bold text-white">My Clubs</Text>
-                        <Text className="text-gray-300 text-sm mt-1">Manage your clubs</Text>
-                    </View>
-                    <TouchableOpacity
-                        onPress={() => router.push('/(organizer)/create-club')}
-                        className="w-12 h-12 rounded-full bg-purple-500/20 items-center justify-center"
-                    >
-                        <FontAwesome name="plus" size={20} color="#A855F7" />
-                    </TouchableOpacity>
-                </GlassContainer>
-            </View>
+            <OrganizerHeaderCard
+                title="My Clubs"
+                subtitle="Manage your clubs"
+                icon="group"
+                rightAction={{
+                    icon: 'plus',
+                    onPress: () => router.push('/(organizer)/create-club'),
+                }}
+            />
 
             <FlatList
                 data={clubs}
@@ -107,30 +74,52 @@ export default function ClubsScreen() {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        tintColor="#FFFFFF"
+                        tintColor={Theme.colors.accent.purpleLight}
                     />
                 }
                 ListEmptyComponent={
-                    <View className="items-center mt-20 px-6">
-                        <FontAwesome name="group" size={48} color="#4B5563" />
-                        <Text className="text-center mt-4 text-gray-400 text-base font-semibold">
+                    <View style={styles.emptyContainer}>
+                        <FontAwesome name="group" size={48} color={Theme.colors.text.disabled} />
+                        <Text style={styles.emptyTitle}>
                             No clubs created yet
                         </Text>
-                        <Text className="text-center mt-2 text-gray-500 text-sm">
+                        <Text style={styles.emptySubtitle}>
                             Create your first club to organize events!
                         </Text>
-                        <TouchableOpacity
-                            onPress={() => router.push('/(organizer)/create-club')}
-                            className="mt-6 px-6 py-3 rounded-xl bg-purple-500/20 border border-purple-500/30"
-                        >
-                            <Text className="text-purple-300 font-bold">Create Club</Text>
-                        </TouchableOpacity>
                     </View>
                 }
-                contentContainerStyle={{ paddingBottom: 100 }}
+                contentContainerStyle={styles.listContent}
             />
         </ScreenWrapper>
     );
 }
+
+const styles = StyleSheet.create({
+    loadingContainer: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    listContent: {
+        paddingBottom: 120,
+    },
+    emptyContainer: {
+        alignItems: 'center',
+        marginTop: Theme.spacing.xxxl * 2,
+        paddingHorizontal: Theme.layout.padding.horizontal,
+    },
+    emptyTitle: {
+        fontSize: Theme.typography.fontSize.lg,
+        fontWeight: '600',
+        color: Theme.colors.text.secondary,
+        marginTop: Theme.spacing.lg,
+        textAlign: 'center',
+    },
+    emptySubtitle: {
+        fontSize: Theme.typography.fontSize.sm,
+        color: Theme.colors.text.muted,
+        marginTop: Theme.spacing.sm,
+        textAlign: 'center',
+    },
+});
 
 

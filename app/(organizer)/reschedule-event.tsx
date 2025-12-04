@@ -166,7 +166,7 @@ export default function RescheduleEvent() {
             >
                 <ScrollView
                     className="flex-1"
-                    contentContainerStyle={{ paddingBottom: 20 }}
+                    contentContainerStyle={{ paddingBottom: 120 }}
                     keyboardShouldPersistTaps="handled"
                 >
                     {/* Header */}

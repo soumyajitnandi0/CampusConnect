@@ -1,14 +1,21 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { CreateEventHeader } from '../../components/ui/CreateEventHeader';
 import { GlassContainer } from '../../components/ui/GlassContainer';
 import { GlassInput } from '../../components/ui/GlassInput';
+import { PremiumGlassCard } from '../../components/ui/PremiumGlassCard';
 import { ScreenWrapper } from '../../components/ui/ScreenWrapper';
+import { Theme } from '../../constants/theme';
 import api from '../../services/api';
+import { uploadImage } from '../../services/upload.service';
+import { getEventCardImageUrl } from '../../utils/cloudinary';
+import { hexToRgba } from '../../utils/colorUtils';
 import { formatEventDate } from '../../utils/event.utils';
 import { storage } from "../../utils/storage";
 
@@ -18,7 +25,9 @@ export default function CreateEvent() {
     const [location, setLocation] = useState('');
     const [mode, setMode] = useState('offline'); // 'online' or 'offline'
     const [participantCount, setParticipantCount] = useState('');
-    const [imageUrl, setImageUrl] = useState('');
+    const [imagePublicId, setImagePublicId] = useState<string | null>(null);
+    const [imagePreviewUri, setImagePreviewUri] = useState<string | null>(null);
+    const [uploadingImage, setUploadingImage] = useState(false);
     const [date, setDate] = useState<Date>(new Date(Date.now() + 24 * 60 * 60 * 1000)); // Tomorrow by default
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [showTimePicker, setShowTimePicker] = useState(false);
@@ -34,7 +43,50 @@ export default function CreateEvent() {
 
     useEffect(() => {
         fetchClubs();
+        requestImagePermission();
     }, []);
+
+    const requestImagePermission = async () => {
+        if (Platform.OS !== 'web') {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Permission Required', 'We need access to your photos to upload event images.');
+            }
+        }
+    };
+
+    const handlePickImage = async () => {
+        try {
+            // Use string 'images' directly (MediaType is a type alias, not an object)
+            // MediaTypeOptions.Images is deprecated, but string 'images' is the recommended format
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: 'images', // Can also be ['images'] for array format
+                allowsEditing: true,
+                aspect: [16, 9], // Recommended 16:9 aspect ratio
+                quality: 0.8,
+            });
+
+            if (!result.canceled && result.assets[0]) {
+                const asset = result.assets[0];
+                setImagePreviewUri(asset.uri);
+                
+                // Upload image
+                setUploadingImage(true);
+                try {
+                    const uploadResult = await uploadImage(asset.uri);
+                    setImagePublicId(uploadResult.publicId);
+                    Alert.alert('Success', 'Image uploaded successfully');
+                } catch (error: any) {
+                    Alert.alert('Upload Failed', error.message || 'Failed to upload image');
+                    setImagePreviewUri(null);
+                } finally {
+                    setUploadingImage(false);
+                }
+            }
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'Failed to pick image');
+        }
+    };
 
     const fetchClubs = async () => {
         try {
@@ -151,10 +203,10 @@ export default function CreateEvent() {
                 return;
             }
 
-            // Clean imageUrl - remove empty strings
-            const cleanImageUrl = imageUrl && imageUrl.trim() !== '' ? imageUrl.trim() : undefined;
+            // Use Cloudinary public ID for image
+            const cleanImageUrl = imagePublicId || undefined;
 
-            console.log('Creating event with imageUrl:', cleanImageUrl);
+            console.log('Creating event with imagePublicId:', cleanImageUrl);
 
             // Prepare duration object
             const duration = {
@@ -187,87 +239,111 @@ export default function CreateEvent() {
 
     return (
         <ScreenWrapper>
+            <CreateEventHeader
+                title="Create Event"
+                subtitle="Bring your ideas to life"
+                icon="magic"
+            />
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                className="flex-1"
+                style={styles.keyboardView}
             >
                 <ScrollView
-                    className="flex-1"
-                    contentContainerStyle={{ paddingBottom: 40 }}
+                    style={styles.scrollView}
+                    contentContainerStyle={styles.scrollContent}
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
-                    {/* Header with Gradient */}
-                    <LinearGradient
-                        colors={['#1F2937', '#111827', '#0A0A0A']}
-                        className="px-6 pt-16 pb-8"
-                    >
-                        <View className="flex-row justify-between items-center mb-6">
-                            <View className="flex-1">
-                                <View className="flex-row items-center mb-2">
-                                    <GlassContainer className="w-12 h-12 rounded-full items-center justify-center p-0 mr-3" intensity={30}>
-                                        <FontAwesome name="calendar-plus-o" size={24} color="#A855F7" />
-                                    </GlassContainer>
-                                    <View className="flex-1">
-                                        <Text className="text-3xl font-bold text-white">Create Event</Text>
-                                        <Text className="text-gray-400 text-sm mt-1">Bring your ideas to life</Text>
-                                    </View>
-                                </View>
-                            </View>
-                            <TouchableOpacity
-                                onPress={() => router.back()}
-                                className="w-10 h-10 rounded-full items-center justify-center bg-white/10 border border-white/20"
-                            >
-                                <FontAwesome name="times" size={18} color="#FFFFFF" />
-                            </TouchableOpacity>
-                        </View>
-                    </LinearGradient>
-
-                    <View className="px-6 -mt-4">
+                    <View style={styles.content}>
                         {/* Image Preview Section */}
-                        <GlassContainer className="rounded-3xl mb-6 overflow-hidden p-0" intensity={20}>
-                            {imageUrl && imageUrl.trim() !== '' ? (
-                                <View className="relative">
+                        <PremiumGlassCard style={styles.imageCard} intensity={Theme.blur.medium} gradient>
+                            {imagePreviewUri || imagePublicId ? (
+                                <View style={styles.imageWrapper}>
                                     <Image
-                                        source={{ uri: imageUrl.trim() }}
-                                        style={{ width: '100%', height: 220 }}
+                                        source={{ 
+                                            uri: imagePreviewUri || (imagePublicId ? getEventCardImageUrl(imagePublicId, 800) : '')
+                                        }}
+                                        style={styles.previewImage}
                                         contentFit="cover"
                                         transition={200}
-                                        onError={(error) => {
-                                            console.error('Preview image error:', error);
-                                            Alert.alert('Image Error', 'Could not load preview image. Please check the URL.');
-                                        }}
                                     />
                                     <LinearGradient
-                                        colors={['transparent', 'rgba(0,0,0,0.7)']}
-                                        className="absolute bottom-0 left-0 right-0 h-20"
+                                        colors={['transparent', hexToRgba(Theme.colors.background.primary, 0.8)]}
+                                        style={styles.imageOverlay}
                                     />
-                                    <View className="absolute bottom-4 left-4 right-4">
-                                        <Text className="text-white font-bold text-lg">{title || 'Event Cover'}</Text>
+                                    <View style={styles.imageTitleContainer}>
+                                        <Text style={styles.imageTitle}>{title || 'Event Cover'}</Text>
                                     </View>
+                                    {uploadingImage && (
+                                        <View style={styles.uploadingOverlay}>
+                                            <ActivityIndicator size="large" color={Theme.colors.accent.purpleLight} />
+                                            <Text style={styles.uploadingText}>Uploading...</Text>
+                                        </View>
+                                    )}
                                 </View>
                             ) : (
-                                <View className="h-48 items-center justify-center bg-gradient-to-br from-purple-500/10 to-blue-500/10">
-                                    <GlassContainer className="w-20 h-20 rounded-full items-center justify-center mb-4" intensity={30}>
-                                        <FontAwesome name="image" size={32} color="#A855F7" />
-                                    </GlassContainer>
-                                    <Text className="text-gray-300 font-semibold text-base">Cover Image</Text>
-                                    <Text className="text-gray-500 text-xs mt-1">Add a URL to preview</Text>
-                                </View>
+                                <TouchableOpacity
+                                    onPress={handlePickImage}
+                                    disabled={uploadingImage}
+                                    activeOpacity={0.8}
+                                    style={styles.imagePlaceholderButton}
+                                >
+                                    <LinearGradient
+                                        colors={[
+                                            hexToRgba(Theme.colors.accent.purple, 0.1),
+                                            hexToRgba(Theme.colors.accent.blue, 0.05),
+                                        ]}
+                                        style={styles.imagePlaceholder}
+                                    >
+                                        {uploadingImage ? (
+                                            <>
+                                                <ActivityIndicator size="large" color={Theme.colors.accent.purpleLight} />
+                                                <Text style={styles.placeholderText}>Uploading...</Text>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <PremiumGlassCard style={styles.placeholderIconContainer} intensity={Theme.blur.medium}>
+                                                    <FontAwesome name="image" size={32} color={Theme.colors.accent.purpleLight} />
+                                                </PremiumGlassCard>
+                                                <Text style={styles.placeholderTitle}>Cover Image</Text>
+                                                <Text style={styles.placeholderSubtitle}>Tap to upload (16:9 recommended)</Text>
+                                            </>
+                                        )}
+                                    </LinearGradient>
+                                </TouchableOpacity>
                             )}
-                        </GlassContainer>
+                        </PremiumGlassCard>
 
-                        <View className="mb-4">
-                            <GlassInput
-                                label="Image URL (Optional)"
-                                placeholder="https://example.com/image.jpg"
-                                value={imageUrl}
-                                onChangeText={setImageUrl}
-                                autoCapitalize="none"
-                                keyboardType="url"
-                                icon="link"
-                            />
-                        </View>
+                        {/* Image Actions */}
+                        {(imagePreviewUri || imagePublicId) && (
+                            <View className="mb-4 flex-row gap-2">
+                                <TouchableOpacity
+                                    onPress={handlePickImage}
+                                    disabled={uploadingImage}
+                                    className="flex-1"
+                                    activeOpacity={0.7}
+                                >
+                                    <GlassContainer className="p-3 items-center" intensity={20}>
+                                        <FontAwesome name="refresh" size={16} color="#A855F7" />
+                                        <Text className="text-gray-300 text-xs mt-1">Change Image</Text>
+                                    </GlassContainer>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setImagePublicId(null);
+                                        setImagePreviewUri(null);
+                                    }}
+                                    disabled={uploadingImage}
+                                    className="flex-1"
+                                    activeOpacity={0.7}
+                                >
+                                    <GlassContainer className="p-3 items-center" intensity={20}>
+                                        <FontAwesome name="trash" size={16} color="#EF4444" />
+                                        <Text className="text-gray-300 text-xs mt-1">Remove</Text>
+                                    </GlassContainer>
+                                </TouchableOpacity>
+                            </View>
+                        )}
 
                         {/* Club Selection */}
                         {!loadingClubs && clubs.length > 0 && (
@@ -597,21 +673,25 @@ export default function CreateEvent() {
                         <TouchableOpacity
                             onPress={handleCreate}
                             disabled={loading}
-                            className="mb-6 rounded-2xl overflow-hidden"
+                            style={styles.createButton}
+                            activeOpacity={0.8}
                         >
                             <LinearGradient
-                                colors={loading ? ['#6B7280', '#4B5563'] : ['#A855F7', '#9333EA']}
-                                className="py-5 items-center justify-center"
-                                style={{ opacity: loading ? 0.7 : 1 }}
+                                colors={loading 
+                                    ? [Theme.colors.text.muted, Theme.colors.text.disabled]
+                                    : [Theme.colors.accent.purple, Theme.colors.accent.purpleDark]
+                                }
+                                style={[styles.createButtonGradient, { opacity: loading ? 0.7 : 1 }]}
                             >
                                 {loading ? (
-                                    <View className="flex-row items-center">
-                                        <Text className="text-white font-bold text-lg mr-3">Creating...</Text>
+                                    <View style={styles.createButtonContent}>
+                                        <ActivityIndicator size="small" color={Theme.colors.text.primary} />
+                                        <Text style={styles.createButtonText}>Creating...</Text>
                                     </View>
                                 ) : (
-                                    <View className="flex-row items-center">
-                                        <FontAwesome name="check-circle" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
-                                        <Text className="text-white font-bold text-lg">Create Event</Text>
+                                    <View style={styles.createButtonContent}>
+                                        <FontAwesome name="check-circle" size={Theme.typography.fontSize.xl} color={Theme.colors.text.primary} style={{ marginRight: Theme.spacing.sm }} />
+                                        <Text style={styles.createButtonText}>Create Event</Text>
                                     </View>
                                 )}
                             </LinearGradient>
@@ -622,3 +702,117 @@ export default function CreateEvent() {
         </ScreenWrapper>
     );
 }
+
+const styles = StyleSheet.create({
+    keyboardView: {
+        flex: 1,
+    },
+    scrollView: {
+        flex: 1,
+    },
+    scrollContent: {
+        paddingBottom: 120,
+    },
+    content: {
+        paddingHorizontal: Theme.layout.padding.horizontal,
+        paddingTop: Theme.spacing.xl,
+    },
+    imageCard: {
+        marginBottom: Theme.spacing.xl,
+        padding: 0,
+        overflow: 'hidden',
+        borderRadius: Theme.radius.xxl,
+    },
+    imageWrapper: {
+        width: '100%',
+        height: 220,
+        position: 'relative',
+    },
+    previewImage: {
+        width: '100%',
+        height: '100%',
+    },
+    imageOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        height: '40%',
+        bottom: 0,
+    },
+    imageTitleContainer: {
+        position: 'absolute',
+        bottom: Theme.spacing.lg,
+        left: Theme.spacing.lg,
+        right: Theme.spacing.lg,
+    },
+    imageTitle: {
+        fontSize: Theme.typography.fontSize.lg,
+        fontWeight: '700',
+        color: Theme.colors.text.primary,
+    },
+    uploadingOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: hexToRgba(Theme.colors.background.primary, 0.5),
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    uploadingText: {
+        fontSize: Theme.typography.fontSize.sm,
+        color: Theme.colors.text.primary,
+        marginTop: Theme.spacing.sm,
+    },
+    imagePlaceholderButton: {
+        width: '100%',
+        height: 220,
+    },
+    imagePlaceholder: {
+        width: '100%',
+        height: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    placeholderIconContainer: {
+        width: 80,
+        height: 80,
+        borderRadius: Theme.radius.full,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: Theme.spacing.lg,
+        padding: 0,
+    },
+    placeholderTitle: {
+        fontSize: Theme.typography.fontSize.base,
+        fontWeight: '600',
+        color: Theme.colors.text.secondary,
+        marginBottom: Theme.spacing.xs,
+    },
+    placeholderSubtitle: {
+        fontSize: Theme.typography.fontSize.xs,
+        color: Theme.colors.text.muted,
+    },
+    placeholderText: {
+        fontSize: Theme.typography.fontSize.base,
+        fontWeight: '600',
+        color: Theme.colors.text.secondary,
+        marginTop: Theme.spacing.lg,
+    },
+    createButton: {
+        marginTop: Theme.spacing.xl,
+        marginBottom: Theme.spacing.xxxl,
+        borderRadius: Theme.radius.full,
+        overflow: 'hidden',
+        ...Theme.shadows.md,
+    },
+    createButtonGradient: {
+        paddingVertical: Theme.spacing.xl,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    createButtonContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    createButtonText: {
+        fontSize: Theme.typography.fontSize.lg,
+        fontWeight: '700',
+        color: Theme.colors.text.primary,
+    },
+});

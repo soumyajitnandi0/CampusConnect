@@ -1,14 +1,19 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GlassContainer } from '../../components/ui/GlassContainer';
+import { ChatBubble } from '../../components/ui/ChatBubble';
+import { PremiumHeader } from '../../components/ui/PremiumHeader';
 import { ScreenWrapper } from '../../components/ui/ScreenWrapper';
+import { Theme } from '../../constants/theme';
 import { useAuth } from '../../contexts/auth.context';
 import { ChatService } from '../../services/chat.service';
 import { ClubService } from '../../services/club.service';
 import { Club, Message } from '../../types/models';
+import { hexToRgba } from '../../utils/colorUtils';
 
 export default function ClubChatScreen() {
     const { clubId } = useLocalSearchParams<{ clubId: string }>();
@@ -28,10 +33,9 @@ export default function ClubChatScreen() {
         if (clubId) {
             fetchClub();
             fetchMessages();
-            // Set up polling for new messages
             const interval = setInterval(() => {
                 fetchMessages(true);
-            }, 3000); // Poll every 3 seconds
+            }, 3000);
 
             return () => clearInterval(interval);
         }
@@ -51,7 +55,6 @@ export default function ClubChatScreen() {
             if (!silent) setLoadingMessages(true);
             const fetchedMessages = await ChatService.getMessages(clubId);
             setMessages(fetchedMessages);
-            // Scroll to bottom after loading
             setTimeout(() => {
                 scrollViewRef.current?.scrollToEnd({ animated: false });
             }, 100);
@@ -75,7 +78,6 @@ export default function ClubChatScreen() {
             const newMessage = await ChatService.sendMessage(clubId, message);
             setMessages(prev => [...prev, newMessage]);
             setMessage('');
-            // Scroll to bottom after sending
             setTimeout(() => {
                 scrollViewRef.current?.scrollToEnd({ animated: true });
             }, 100);
@@ -86,22 +88,10 @@ export default function ClubChatScreen() {
         }
     };
 
-    const formatTime = (date: Date) => {
-        const now = new Date();
-        const messageDate = new Date(date);
-        const diff = now.getTime() - messageDate.getTime();
-        const minutes = Math.floor(diff / 60000);
-
-        if (minutes < 1) return 'Just now';
-        if (minutes < 60) return `${minutes}m ago`;
-        if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`;
-        return messageDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    };
-
     if (loading) {
         return (
             <ScreenWrapper className="justify-center items-center">
-                <ActivityIndicator size="large" color="#FFFFFF" />
+                <ActivityIndicator size="large" color={Theme.colors.text.primary} />
             </ScreenWrapper>
         );
     }
@@ -109,117 +99,102 @@ export default function ClubChatScreen() {
     if (!club) {
         return (
             <ScreenWrapper className="justify-center items-center">
-                <Text className="text-white">Club not found</Text>
+                <Text style={styles.errorText}>Club not found</Text>
             </ScreenWrapper>
         );
     }
 
     return (
         <ScreenWrapper>
+            <PremiumHeader 
+                title={club.name}
+                rightComponent={
+                    <Text style={styles.memberCount}>{club.followerCount} members</Text>
+                }
+            />
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                className="flex-1"
+                style={styles.container}
                 keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
             >
-                {/* Header */}
-                <View className="px-6 pt-16 pb-4 flex-row items-center justify-between border-b border-white/10 bg-black/50">
-                    <View className="flex-row items-center flex-1">
-                        <TouchableOpacity
-                            onPress={() => router.back()}
-                            className="w-10 h-10 rounded-full items-center justify-center bg-white/10 mr-3"
-                        >
-                            <FontAwesome name="arrow-left" size={20} color="#FFFFFF" />
-                        </TouchableOpacity>
-                        <View className="flex-1">
-                            <Text className="text-white font-bold text-lg" numberOfLines={1}>{club.name}</Text>
-                            <Text className="text-gray-400 text-xs">{club.followerCount} members</Text>
-                        </View>
-                    </View>
-                </View>
+                {/* Background Gradient */}
+                <LinearGradient
+                    colors={[Theme.colors.background.primary, Theme.colors.background.secondary]}
+                    style={StyleSheet.absoluteFill}
+                />
 
                 {/* Messages List */}
                 <ScrollView
                     ref={scrollViewRef}
-                    className="flex-1"
-                    contentContainerStyle={{ padding: 16, paddingBottom: 20 }}
+                    style={styles.messagesContainer}
+                    contentContainerStyle={styles.messagesContent}
                     onContentSizeChange={() => {
                         scrollViewRef.current?.scrollToEnd({ animated: true });
                     }}
+                    showsVerticalScrollIndicator={false}
                 >
                     {loadingMessages && messages.length === 0 ? (
-                        <View className="items-center py-8">
-                            <ActivityIndicator size="small" color="#A855F7" />
+                        <View style={styles.loadingContainer}>
+                            <ActivityIndicator size="small" color={Theme.colors.accent.purple} />
                         </View>
                     ) : messages.length > 0 ? (
                         messages.map((msg) => {
                             const isOwnMessage = user && msg.user === user.id;
                             return (
-                                <View
+                                <ChatBubble
                                     key={msg.id}
-                                    className={`mb-3 ${isOwnMessage ? 'items-end' : 'items-start'}`}
-                                >
-                                    <View
-                                        className={`max-w-[75%] rounded-2xl px-4 py-3 ${
-                                            isOwnMessage
-                                                ? 'bg-blue-500/30 border border-blue-500/30'
-                                                : 'bg-white/10 border border-white/10'
-                                        }`}
-                                    >
-                                        {!isOwnMessage && (
-                                            <Text className="text-purple-300 text-xs font-semibold mb-1">
-                                                {msg.userName || 'Anonymous'}
-                                            </Text>
-                                        )}
-                                        <Text className={`text-sm ${isOwnMessage ? 'text-white' : 'text-gray-200'}`}>
-                                            {msg.message}
-                                        </Text>
-                                        <Text className={`text-[10px] mt-1 ${isOwnMessage ? 'text-blue-300' : 'text-gray-500'}`}>
-                                            {formatTime(msg.createdAt)}
-                                        </Text>
-                                    </View>
-                                </View>
+                                    message={msg.message}
+                                    userName={msg.userName}
+                                    timestamp={msg.createdAt}
+                                    isOwn={isOwnMessage || false}
+                                />
                             );
                         })
                     ) : (
-                        <View className="items-center py-12">
-                            <FontAwesome name="comments-o" size={48} color="#4B5563" />
-                            <Text className="text-gray-400 text-base mt-4 text-center">
-                                No messages yet
-                            </Text>
-                            <Text className="text-gray-500 text-sm mt-2 text-center">
-                                Start the conversation!
-                            </Text>
+                        <View style={styles.emptyState}>
+                            <FontAwesome name="comments-o" size={56} color={Theme.colors.text.disabled} />
+                            <Text style={styles.emptyTitle}>No messages yet</Text>
+                            <Text style={styles.emptySubtitle}>Start the conversation!</Text>
                         </View>
                     )}
                 </ScrollView>
 
-                {/* Message Input */}
-                <View className="px-4 pt-4 border-t border-white/10 bg-black/50" style={{ paddingBottom: bottomPadding }}>
-                    <View className="flex-row items-end">
-                        <GlassContainer className="flex-1 mr-3" intensity={20}>
+                {/* Message Input Bar */}
+                <View style={[styles.inputContainer, { paddingBottom: bottomPadding }]}>
+                    <View style={styles.inputBar}>
+                        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                        <View style={styles.inputContent}>
                             <TextInput
-                                className="text-white text-base py-3 px-4"
+                                style={styles.input}
                                 placeholder="Type a message..."
-                                placeholderTextColor="#6B7280"
+                                placeholderTextColor={Theme.colors.text.disabled}
                                 value={message}
                                 onChangeText={setMessage}
                                 multiline
                                 maxLength={500}
-                                style={{ maxHeight: 100 }}
+                                textAlignVertical="center"
                             />
-                        </GlassContainer>
-                        <TouchableOpacity
-                            onPress={handleSendMessage}
-                            disabled={!message.trim() || sending}
-                            className="w-12 h-12 rounded-full bg-purple-500/30 border border-purple-500/30 items-center justify-center"
-                            style={{ opacity: (!message.trim() || sending) ? 0.5 : 1 }}
-                        >
-                            {sending ? (
-                                <ActivityIndicator size="small" color="#A855F7" />
-                            ) : (
-                                <FontAwesome name="paper-plane" size={18} color="#A855F7" />
-                            )}
-                        </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={handleSendMessage}
+                                disabled={!message.trim() || sending}
+                                style={[
+                                    styles.sendButton,
+                                    (!message.trim() || sending) && styles.sendButtonDisabled
+                                ]}
+                                activeOpacity={0.7}
+                            >
+                                <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+                                <LinearGradient
+                                    colors={[hexToRgba(Theme.colors.accent.purple, 0.4), hexToRgba(Theme.colors.accent.purple, 0.2)]}
+                                    style={StyleSheet.absoluteFill}
+                                />
+                                {sending ? (
+                                    <ActivityIndicator size="small" color={Theme.colors.accent.purpleLight} />
+                                ) : (
+                                    <FontAwesome name="paper-plane" size={20} color={Theme.colors.accent.purpleLight} />
+                                )}
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
             </KeyboardAvoidingView>
@@ -227,3 +202,88 @@ export default function ClubChatScreen() {
     );
 }
 
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+    },
+    memberCount: {
+        fontSize: Theme.typography.fontSize.xs,
+        color: Theme.colors.text.muted,
+        fontWeight: '500',
+    },
+    messagesContainer: {
+        flex: 1,
+    },
+    messagesContent: {
+        padding: Theme.layout.padding.horizontal,
+        paddingTop: Theme.spacing.lg,
+        paddingBottom: 120,
+    },
+    loadingContainer: {
+        alignItems: 'center',
+        paddingVertical: Theme.spacing.xxl,
+    },
+    emptyState: {
+        alignItems: 'center',
+        paddingVertical: Theme.spacing.xxxl,
+    },
+    emptyTitle: {
+        fontSize: Theme.typography.fontSize.lg,
+        fontWeight: '600',
+        color: Theme.colors.text.secondary,
+        marginTop: Theme.spacing.lg,
+    },
+    emptySubtitle: {
+        fontSize: Theme.typography.fontSize.sm,
+        color: Theme.colors.text.muted,
+        marginTop: Theme.spacing.xs,
+        textAlign: 'center',
+    },
+    inputContainer: {
+        paddingHorizontal: Theme.layout.padding.horizontal,
+        paddingTop: Theme.spacing.md,
+        borderTopWidth: 1,
+        borderTopColor: Theme.colors.glass.border,
+        backgroundColor: hexToRgba(Theme.colors.background.primary, 0.8),
+    },
+    inputBar: {
+        height: 56,
+        borderRadius: Theme.radius.full,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: Theme.colors.glass.border,
+        ...Theme.shadows.sm,
+    },
+    inputContent: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: Theme.spacing.md,
+        gap: Theme.spacing.sm,
+    },
+    input: {
+        flex: 1,
+        fontSize: Theme.typography.fontSize.base,
+        color: Theme.colors.text.primary,
+        fontWeight: '500',
+        maxHeight: 100,
+        paddingVertical: Theme.spacing.md,
+    },
+    sendButton: {
+        width: 40,
+        height: 40,
+        borderRadius: Theme.radius.full,
+        overflow: 'hidden',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: hexToRgba(Theme.colors.accent.purple, 0.5),
+    },
+    sendButtonDisabled: {
+        opacity: 0.5,
+    },
+    errorText: {
+        fontSize: Theme.typography.fontSize.base,
+        color: Theme.colors.text.muted,
+    },
+});

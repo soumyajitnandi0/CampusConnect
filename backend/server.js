@@ -11,6 +11,8 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 app.use(cors());
 app.use(express.json());
+// Handle multipart/form-data for file uploads (multer handles this, but we need to ensure it's not parsed as JSON)
+app.use(express.urlencoded({ extended: true }));
 
 // Database Connection
 const connectDB = async () => {
@@ -41,6 +43,7 @@ app.use('/api/feedback', require('./routes/feedbackRoutes'));
 app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
+app.use('/api/upload', require('./routes/uploadRoutes'));
 
 app.get('/', (req, res) => {
     res.send('CampusConnect API is running');

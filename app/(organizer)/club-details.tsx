@@ -1,14 +1,22 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { EventCard } from '../../components/event-card';
-import { GlassContainer } from '../../components/ui/GlassContainer';
+import { PillTag } from '../../components/ui/PillTag';
+import { PremiumGlassCard } from '../../components/ui/PremiumGlassCard';
+import { PremiumHeader } from '../../components/ui/PremiumHeader';
 import { ScreenWrapper } from '../../components/ui/ScreenWrapper';
+import { SectionTitle } from '../../components/ui/SectionTitle';
+import { Theme } from '../../constants/theme';
 import { ClubService } from '../../services/club.service';
 import { EventService } from '../../services/event.service';
 import { Club, Event } from '../../types/models';
+import { getClubImageUrl } from '../../utils/cloudinary';
+import { hexToRgba } from '../../utils/colorUtils';
 
 export default function ClubDetailsScreen() {
     const { clubId } = useLocalSearchParams<{ clubId: string }>();
@@ -47,118 +55,257 @@ export default function ClubDetailsScreen() {
 
     if (loading) {
         return (
-            <ScreenWrapper className="justify-center items-center">
-                <ActivityIndicator size="large" color="#FFFFFF" />
+            <ScreenWrapper style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={Theme.colors.accent.purpleLight} />
             </ScreenWrapper>
         );
     }
 
     if (!club) {
         return (
-            <ScreenWrapper className="justify-center items-center">
-                <Text className="text-white">Club not found</Text>
+            <ScreenWrapper style={styles.loadingContainer}>
+                <Text style={styles.errorText}>Club not found</Text>
             </ScreenWrapper>
         );
     }
 
+    const clubImageUrl = club.imageUrl
+        ? (club.imageUrl.includes('cloudinary.com') || (!club.imageUrl.includes('http://') && !club.imageUrl.includes('https://')))
+            ? getClubImageUrl(club.imageUrl, 320)
+            : club.imageUrl
+        : null;
+
     return (
         <ScreenWrapper>
+            <PremiumHeader title="Club Details" />
             <ScrollView
-                className="flex-1"
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
                 refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#A855F7" />
+                    <RefreshControl 
+                        refreshing={refreshing} 
+                        onRefresh={onRefresh} 
+                        tintColor={Theme.colors.accent.purpleLight} 
+                    />
                 }
+                showsVerticalScrollIndicator={false}
             >
-                <View className="p-4">
-                    {/* Header */}
-                    <View className="flex-row justify-between items-center mb-4">
-                        <TouchableOpacity
-                            onPress={() => router.back()}
-                            className="w-10 h-10 rounded-full items-center justify-center bg-white/10"
-                        >
-                            <FontAwesome name="arrow-left" size={20} color="#FFFFFF" />
-                        </TouchableOpacity>
-                        <Text className="text-xl font-bold text-white">Club Details</Text>
-                        <View className="w-10" />
-                    </View>
-
-                    {/* Club Header */}
-                    <GlassContainer className="p-6 mb-4">
-                        <View className="flex-row items-center mb-4">
-                            {club.imageUrl ? (
-                                <Image
-                                    source={{ uri: club.imageUrl }}
-                                    style={{ width: 80, height: 80, borderRadius: 16 }}
-                                    contentFit="cover"
-                                />
-                            ) : (
-                                <View className="w-20 h-20 rounded-2xl bg-purple-500/20 items-center justify-center">
-                                    <FontAwesome name="group" size={32} color="#A855F7" />
+                <View style={styles.content}>
+                    {/* Club Info Card */}
+                    <PremiumGlassCard style={styles.clubCard} intensity={Theme.blur.medium} gradient>
+                        <View style={styles.clubInfoContainer}>
+                            {/* Club Image - Only show if image exists */}
+                            {clubImageUrl && (
+                                <View style={styles.imageContainer}>
+                                    <Image
+                                        source={{ uri: clubImageUrl }}
+                                        style={styles.clubImage}
+                                        contentFit="cover"
+                                    />
                                 </View>
                             )}
-                            <View className="flex-1 ml-4">
-                                <Text className="text-2xl font-bold mb-2 text-white">{club.name}</Text>
-                                <View className="flex-row items-center">
-                                    <FontAwesome name="users" size={14} color="#9CA3AF" />
-                                    <Text className="text-gray-400 text-sm ml-2">
+
+                            {/* Club Details */}
+                            <View style={[styles.clubDetails, !clubImageUrl && styles.clubDetailsFullWidth]}>
+                                <Text style={styles.clubName}>{club.name}</Text>
+                                <View style={styles.followerRow}>
+                                    <FontAwesome name="users" size={14} color={Theme.colors.text.muted} />
+                                    <Text style={styles.followerText}>
                                         {club.followerCount} {club.followerCount === 1 ? 'follower' : 'followers'}
                                     </Text>
                                 </View>
                             </View>
                         </View>
-                        <Text className="text-gray-300 text-base mb-4">{club.description}</Text>
+
+                        {/* Description */}
+                        <Text style={styles.description}>{club.description}</Text>
+
+                        {/* Category Tag */}
                         {club.category && (
-                            <View className="px-3 py-1 rounded-full bg-purple-500/20 self-start mb-4">
-                                <Text className="text-purple-300 text-xs font-semibold">{club.category}</Text>
+                            <View style={styles.categoryContainer}>
+                                <PillTag 
+                                    label={club.category} 
+                                    variant="category" 
+                                    glow 
+                                />
                             </View>
                         )}
+
+                        {/* Open Chat Button */}
                         <TouchableOpacity
                             onPress={() => router.push({
                                 pathname: '/(organizer)/club-chat',
                                 params: { clubId: clubId }
                             })}
-                            className="rounded-xl overflow-hidden bg-purple-500/20 border border-purple-500/30"
+                            style={styles.chatButton}
+                            activeOpacity={0.8}
                         >
-                            <View className="py-3 items-center justify-center flex-row">
-                                <FontAwesome name="comments" size={16} color="#A855F7" style={{ marginRight: 6 }} />
-                                <Text className="text-purple-300 font-bold text-base">Open Chat</Text>
-                            </View>
+                            <BlurView intensity={Theme.blur.medium} tint="dark" style={StyleSheet.absoluteFill} />
+                            <LinearGradient
+                                colors={[
+                                    hexToRgba(Theme.colors.accent.purple, 0.4),
+                                    hexToRgba(Theme.colors.accent.purpleDark, 0.3),
+                                ]}
+                                style={StyleSheet.absoluteFill}
+                            />
+                            <FontAwesome name="comments" size={Theme.typography.fontSize.lg} color={Theme.colors.text.primary} style={{ marginRight: Theme.spacing.sm }} />
+                            <Text style={styles.chatButtonText}>Open Chat</Text>
                         </TouchableOpacity>
-                    </GlassContainer>
+                    </PremiumGlassCard>
 
                     {/* Events Section */}
-                    <GlassContainer className="p-4">
-                        <Text className="text-xl font-bold mb-4 text-white">
-                            Club Events ({events.length})
-                        </Text>
+                    <View style={styles.eventsSection}>
+                        <SectionTitle 
+                            title={`Club Events (${events.length})`}
+                        />
+                        
                         {events.length > 0 ? (
                             <FlatList
                                 data={events}
                                 renderItem={({ item }) => (
-                                    <EventCard
-                                        event={item}
-                                        onPress={() => router.push({
-                                            pathname: '/(organizer)/event-details',
-                                            params: { id: item.id }
-                                        })}
-                                        showActions={false}
-                                    />
+                                    <View style={styles.eventCardWrapper}>
+                                        <EventCard
+                                            event={item}
+                                            onPress={() => router.push({
+                                                pathname: '/(organizer)/event-details',
+                                                params: { id: item.id }
+                                            })}
+                                            showActions={false}
+                                        />
+                                    </View>
                                 )}
                                 keyExtractor={(item) => item.id}
                                 scrollEnabled={false}
                             />
                         ) : (
-                            <View className="items-center py-8">
-                                <FontAwesome name="calendar-times-o" size={32} color="#6B7280" />
-                                <Text className="text-gray-500 mt-2">No events yet</Text>
-                            </View>
+                            <PremiumGlassCard style={styles.emptyEventsCard} intensity={Theme.blur.light}>
+                                <View style={styles.emptyEventsContainer}>
+                                    <FontAwesome name="calendar-times-o" size={48} color={Theme.colors.text.disabled} />
+                                    <Text style={styles.emptyEventsText}>No events yet</Text>
+                                    <Text style={styles.emptyEventsSubtext}>
+                                        Events created for this club will appear here
+                                    </Text>
+                                </View>
+                            </PremiumGlassCard>
                         )}
-                    </GlassContainer>
-
-                    <View className="h-10" />
+                    </View>
                 </View>
             </ScrollView>
         </ScreenWrapper>
     );
 }
 
+const styles = StyleSheet.create({
+    loadingContainer: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    errorText: {
+        fontSize: Theme.typography.fontSize.base,
+        color: Theme.colors.text.secondary,
+    },
+    scrollView: {
+        flex: 1,
+    },
+    scrollContent: {
+        paddingBottom: 120,
+    },
+    content: {
+        paddingHorizontal: Theme.layout.padding.horizontal,
+        paddingTop: Theme.spacing.xl,
+    },
+    clubCard: {
+        marginBottom: Theme.spacing.xxxl,
+    },
+    clubInfoContainer: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        marginBottom: Theme.spacing.lg,
+    },
+    imageContainer: {
+        width: 80,
+        height: 80,
+        borderRadius: Theme.radius.xl,
+        overflow: 'hidden',
+        marginRight: Theme.spacing.lg,
+        borderWidth: 2,
+        borderColor: hexToRgba(Theme.colors.accent.purple, 0.3),
+        ...Theme.shadows.md,
+    },
+    clubImage: {
+        width: '100%',
+        height: '100%',
+    },
+    clubDetails: {
+        flex: 1,
+    },
+    clubDetailsFullWidth: {
+        marginLeft: 0,
+    },
+    clubName: {
+        fontSize: Theme.typography.fontSize['2xl'],
+        fontWeight: '700',
+        color: Theme.colors.text.primary,
+        marginBottom: Theme.spacing.sm,
+    },
+    followerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Theme.spacing.xs,
+    },
+    followerText: {
+        fontSize: Theme.typography.fontSize.sm,
+        color: Theme.colors.text.muted,
+        fontWeight: '500',
+    },
+    description: {
+        fontSize: Theme.typography.fontSize.base,
+        color: Theme.colors.text.tertiary,
+        lineHeight: Theme.typography.fontSize.base * Theme.typography.lineHeight.normal,
+        marginBottom: Theme.spacing.lg,
+    },
+    categoryContainer: {
+        marginBottom: Theme.spacing.xl,
+        alignSelf: 'flex-start',
+    },
+    chatButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: Theme.spacing.lg,
+        borderRadius: Theme.radius.full,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: hexToRgba(Theme.colors.accent.purple, 0.5),
+        ...Theme.shadows.md,
+    },
+    chatButtonText: {
+        fontSize: Theme.typography.fontSize.lg,
+        fontWeight: '700',
+        color: Theme.colors.text.primary,
+    },
+    eventsSection: {
+        marginBottom: Theme.spacing.xxxl,
+    },
+    eventCardWrapper: {
+        marginBottom: Theme.spacing.lg,
+    },
+    emptyEventsCard: {
+        paddingVertical: Theme.spacing.xxxl * 1.5,
+    },
+    emptyEventsContainer: {
+        alignItems: 'center',
+    },
+    emptyEventsText: {
+        fontSize: Theme.typography.fontSize.lg,
+        fontWeight: '600',
+        color: Theme.colors.text.secondary,
+        marginTop: Theme.spacing.lg,
+    },
+    emptyEventsSubtext: {
+        fontSize: Theme.typography.fontSize.sm,
+        color: Theme.colors.text.muted,
+        marginTop: Theme.spacing.sm,
+        textAlign: 'center',
+    },
+});

@@ -113,17 +113,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Update session timestamp on sync (user is still active)
       await sessionManager.saveLoginTimestamp();
     } catch (error: any) {
-      console.error('Error syncing user:', error);
-      
-      // If 400 error, it means user needs to select role - don't throw, just log
+      // If 400 error, it means user needs to select role - this is expected behavior
       // The login screen will handle redirecting to role selection
       if (error.response?.status === 400) {
         const errorMsg = error.response?.data?.msg || 'Role selection required';
-        console.log('User needs role selection:', errorMsg);
+        // Only log as info, not error, since this is expected for new users
+        console.log('[Auth] User needs role selection:', errorMsg);
         // Don't throw - let the login flow handle it
         return;
       }
       
+      // For other errors (network, 500, etc.), log as error
+      console.error('Error syncing user:', error);
       throw error;
     }
   };

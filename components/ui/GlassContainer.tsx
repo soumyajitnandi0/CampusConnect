@@ -1,6 +1,7 @@
 import { BlurView } from 'expo-blur';
 import React from 'react';
 import { StyleSheet, View, ViewProps } from 'react-native';
+import { Theme } from '../../constants/theme';
 import { cn } from '../../utils/cn';
 
 interface GlassContainerProps extends ViewProps {
@@ -25,7 +26,16 @@ export const GlassContainer: React.FC<GlassContainerProps> = ({
                 'overflow-hidden rounded-2xl border border-glass-border bg-glass-black/30 relative',
                 className
             )}
-            style={style}
+            style={[
+                {
+                    borderRadius: Theme.radius.xl,
+                    backgroundColor: Theme.colors.glass.medium,
+                    borderWidth: 1,
+                    borderColor: Theme.colors.glass.borderLight,
+                    ...Theme.shadows.sm,
+                },
+                style
+            ]}
             {...props}
         >
             <BlurView

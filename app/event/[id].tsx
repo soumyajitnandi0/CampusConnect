@@ -1,13 +1,21 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { PillTag } from '../../components/ui/PillTag';
+import { PremiumGlassCard } from '../../components/ui/PremiumGlassCard';
+import { PremiumHeader } from '../../components/ui/PremiumHeader';
+import { ScreenWrapper } from '../../components/ui/ScreenWrapper';
+import { Theme } from '../../constants/theme';
 import { useAuth } from '../../contexts/auth.context';
 import { useEvents } from '../../contexts/events.context';
 import { EventService } from '../../services/event.service';
 import { Event } from '../../types/models';
+import { getEventDetailImageUrl } from '../../utils/cloudinary';
+import { hexToRgba } from '../../utils/colorUtils';
 import { formatEventDate, isEventPast } from '../../utils/event.utils';
 
 export default function EventDetailsScreen() {
@@ -51,7 +59,6 @@ export default function EventDetailsScreen() {
             return;
         }
 
-        // Check if event is canceled
         if (event.status === 'canceled') {
             Alert.alert('Event Canceled', 'This event has been canceled. You cannot RSVP to canceled events.');
             return;
@@ -65,7 +72,6 @@ export default function EventDetailsScreen() {
 
         try {
             setRsvping(true);
-            // Check if user is already RSVP'd - handle both array and string formats
             const rsvpsArray = event.rsvps || [];
             const userId = user.id || user._id;
             const isAlreadyRSVPd = rsvpsArray.some((rsvpId: string) => 
@@ -74,10 +80,8 @@ export default function EventDetailsScreen() {
 
             if (isAlreadyRSVPd) {
                 await cancelRSVP(event.id);
-                Alert.alert('Success', 'RSVP cancelled successfully');
             } else {
                 await rsvpForEvent(event.id);
-                Alert.alert('Success', 'You have RSVP\'d to this event!');
             }
             await fetchEventDetails();
             await refreshEvents();
@@ -90,38 +94,32 @@ export default function EventDetailsScreen() {
         }
     };
 
-
-
     if (loading) {
         return (
-            <View className="flex-1 justify-center items-center bg-white">
-                <ActivityIndicator size="large" color="#2563EB" />
-            </View>
+            <ScreenWrapper className="justify-center items-center">
+                <ActivityIndicator size="large" color={Theme.colors.text.primary} />
+            </ScreenWrapper>
         );
     }
 
     if (!event) {
         return (
-            <View className="flex-1 justify-center items-center bg-white px-6">
-                <FontAwesome name="exclamation-circle" size={48} color="#9CA3AF" />
-                <Text className="text-gray-400 text-lg font-semibold mt-4 text-center">
-                    Event not found
-                </Text>
+            <ScreenWrapper className="justify-center items-center">
+                <FontAwesome name="exclamation-circle" size={48} color={Theme.colors.text.disabled} />
+                <Text style={styles.errorText}>Event not found</Text>
                 <TouchableOpacity
                     onPress={() => router.back()}
-                    className="mt-6 px-6 py-3 rounded-xl"
-                    style={{ backgroundColor: '#2563EB' }}
+                    style={styles.errorButton}
                 >
-                    <Text className="text-white font-semibold">Go Back</Text>
+                    <Text style={styles.errorButtonText}>Go Back</Text>
                 </TouchableOpacity>
-            </View>
+            </ScreenWrapper>
         );
     }
 
     const isPast = isEventPast(event);
     const isCanceled = event?.status === 'canceled';
     const isRescheduled = event?.status === 'rescheduled';
-    // Check if user is RSVP'd - handle both array and string formats
     const rsvpsArray = event?.rsvps || [];
     const userId = user?.id || user?._id;
     const isRSVPd = user && rsvpsArray.length > 0 ? rsvpsArray.some((rsvpId: string) => 
@@ -130,192 +128,389 @@ export default function EventDetailsScreen() {
     const canRSVP = !isPast && !isCanceled;
 
     return (
-        <View className="flex-1 bg-black">
+        <ScreenWrapper>
+            <PremiumHeader title="Event Details" />
             <ScrollView
-                className="flex-1"
+                style={styles.scrollView}
                 showsVerticalScrollIndicator={false}
                 refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#60A5FA" />
+                    <RefreshControl 
+                        refreshing={refreshing} 
+                        onRefresh={onRefresh} 
+                        tintColor={Theme.colors.text.primary} 
+                    />
                 }
             >
-                <View className="w-full max-w-4xl self-center min-h-full pb-10">
-                    <View className="relative">
-                        {/* Header Image */}
-                        {event.imageUrl && event.imageUrl.trim() !== '' ? (
-                            <Image
-                                source={{ uri: event.imageUrl.trim() }}
-                                style={{ width: '100%', height: 320 }}
-                                contentFit="cover"
-                                transition={200}
-                                placeholder={{ blurhash: 'LGF5]+Yk^6#M@-5c,1J5@[or[Q6.' }}
-                            />
-                        ) : (
-                            <LinearGradient
-                                colors={['#1F2937', '#111827']}
-                                className="w-full h-80 items-center justify-center"
-                            >
-                                <FontAwesome name="image" size={64} color="#374151" />
-                            </LinearGradient>
+                {/* Header Image - Only show if image exists */}
+                {event.imageUrl && event.imageUrl.trim() !== '' && (
+                    <View style={styles.imageContainer}>
+                        <Image
+                            source={{ 
+                                uri: (event.imageUrl.includes('cloudinary.com') || (!event.imageUrl.includes('http://') && !event.imageUrl.includes('https://')))
+                                    ? getEventDetailImageUrl(event.imageUrl, 1200)
+                                    : event.imageUrl.trim()
+                            }}
+                            style={styles.image}
+                            contentFit="cover"
+                            transition={300}
+                            placeholder={{ blurhash: 'LGF5]+Yk^6#M@-5c,1J5@[or[Q6.' }}
+                        />
+                        <LinearGradient
+                            colors={['transparent', hexToRgba(Theme.colors.background.primary, 0.7)]}
+                            style={styles.imageOverlay}
+                        />
+                    </View>
+                )}
+
+                {/* Main Content */}
+                <View style={styles.content}>
+                    {/* Premium Glass Card */}
+                    <PremiumGlassCard intensity={25} gradient>
+                        {/* Title & Badge */}
+                        <View style={styles.titleRow}>
+                            <Text style={styles.title} numberOfLines={3}>
+                                {event.title}
+                            </Text>
+                            <View style={styles.badgeContainer}>
+                                {isCanceled ? (
+                                    <PillTag label="Canceled" variant="canceled" glow />
+                                ) : isRescheduled ? (
+                                    <PillTag label="Rescheduled" variant="rescheduled" />
+                                ) : isPast ? (
+                                    <PillTag label="Ended" variant="ended" />
+                                ) : (
+                                    <PillTag label="Upcoming" variant="upcoming" glow />
+                                )}
+                            </View>
+                        </View>
+
+                        {/* Rescheduled Notice */}
+                        {isRescheduled && event.rescheduledDate && (
+                            <View style={styles.rescheduledNotice}>
+                                <FontAwesome name="calendar" size={16} color={Theme.colors.accent.orange} />
+                                <Text style={styles.rescheduledText}>
+                                    New Date: {formatEventDate(event.rescheduledDate)}
+                                </Text>
+                            </View>
                         )}
 
-                        {/* Gradient Overlay for Text Readability */}
-                        <LinearGradient
-                            colors={['transparent', 'rgba(0,0,0,0.8)']}
-                            className="absolute bottom-0 left-0 right-0 h-32"
-                        />
-
-                        {/* Back Button Overlay */}
-                        <TouchableOpacity
-                            onPress={() => router.back()}
-                            className="absolute top-12 left-6 w-10 h-10 rounded-full items-center justify-center bg-black/40 backdrop-blur-md border border-white/10"
-                        >
-                            <FontAwesome name="arrow-left" size={20} color="#FFFFFF" />
-                        </TouchableOpacity>
-                    </View>
-
-                    <View className="px-6 -mt-12">
-                        {/* Main Content Card */}
-                        <View className="bg-[#0A0A0A] rounded-[32px] p-6 border border-white/10 shadow-2xl shadow-black/50">
-
-                            {/* Title & Badge Row */}
-                            <View className="flex-row justify-between items-start mb-6">
-                                <Text className="text-3xl md:text-4xl font-bold text-white flex-1 mr-4 leading-tight">
-                                    {event.title}
-                                </Text>
-                                {isCanceled ? (
-                                    <View className="px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20">
-                                        <Text className="text-red-400 font-bold text-[10px] uppercase tracking-wider">Canceled</Text>
-                                    </View>
-                                ) : isRescheduled ? (
-                                    <View className="px-3 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/20">
-                                        <Text className="text-yellow-400 font-bold text-[10px] uppercase tracking-wider">Rescheduled</Text>
-                                    </View>
-                                ) : isPast ? (
-                                    <View className="px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20">
-                                        <Text className="text-red-400 font-bold text-[10px] uppercase tracking-wider">Ended</Text>
-                                    </View>
-                                ) : (
-                                    <View className="px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20">
-                                        <Text className="text-green-400 font-bold text-[10px] uppercase tracking-wider">Upcoming</Text>
-                                    </View>
-                                )}
-                            </View>
-
-                            {/* Date and Location */}
-                            <View className="mb-8 space-y-4 bg-white/5 p-5 rounded-2xl border border-white/5">
-                                {isRescheduled && event.rescheduledDate && (
-                                    <View className="mb-3 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                                        <Text className="text-yellow-400 text-xs font-bold mb-1">Event Rescheduled</Text>
-                                        <Text className="text-yellow-300 text-sm">
-                                            New Date: {formatEventDate(event.rescheduledDate)}
-                                        </Text>
-                                    </View>
-                                )}
-                                <View className="flex-row items-center">
-                                    <View className="w-10 h-10 rounded-full bg-blue-500/10 items-center justify-center mr-4">
-                                        <FontAwesome name="calendar" size={18} color="#60A5FA" />
-                                    </View>
-                                    <View>
-                                        <Text className="text-gray-400 text-xs uppercase font-bold tracking-wider mb-0.5">
-                                            {isRescheduled ? 'Original Date & Time' : 'Date & Time'}
-                                        </Text>
-                                        <Text className="text-white text-base font-semibold">
-                                            {formatEventDate(event.date)}
-                                        </Text>
-                                    </View>
+                        {/* Date & Location Section */}
+                        <PremiumGlassCard intensity={15} style={styles.detailsCard}>
+                            <View style={styles.detailRow}>
+                                <View style={styles.iconContainer}>
+                                    <FontAwesome name="calendar" size={20} color={Theme.colors.accent.blue} />
                                 </View>
-                                <View className="h-[1px] bg-white/5" />
-                                <View className="flex-row items-center">
-                                    <View className="w-10 h-10 rounded-full bg-red-500/10 items-center justify-center mr-4">
-                                        <FontAwesome name="map-marker" size={20} color="#F87171" />
-                                    </View>
-                                    <View className="flex-1">
-                                        <Text className="text-gray-400 text-xs uppercase font-bold tracking-wider mb-0.5">Location</Text>
-                                        <Text className="text-white text-base font-semibold">
-                                            {event.location}
-                                        </Text>
-                                    </View>
-                                </View>
-                            </View>
-
-                            {/* Stats Grid */}
-                            <View className="flex-row mb-8 space-x-3">
-                                <View className="flex-1 bg-white/5 p-4 rounded-2xl border border-white/5 items-center justify-center">
-                                    <FontAwesome name="users" size={20} color="#60A5FA" />
-                                    <Text className="text-white font-bold text-xl mt-2">{event.rsvpCount || 0}</Text>
-                                    <Text className="text-gray-500 text-[10px] uppercase font-bold tracking-wider mt-1">Attending</Text>
-                                </View>
-                                {event.category && (
-                                    <View className="flex-1 bg-white/5 p-4 rounded-2xl border border-white/5 items-center justify-center">
-                                        <FontAwesome name="tag" size={20} color="#A855F7" />
-                                        <Text className="text-white font-bold text-lg mt-2 capitalize">{event.category}</Text>
-                                        <Text className="text-gray-500 text-[10px] uppercase font-bold tracking-wider mt-1">Category</Text>
-                                    </View>
-                                )}
-                            </View>
-
-                            {/* Description */}
-                            <View className="mb-10">
-                                <Text className="text-white text-xl font-bold mb-4">About Event</Text>
-                                <Text className="text-gray-300 text-base leading-7 font-medium">{event.description}</Text>
-                            </View>
-
-                            {/* Action Buttons */}
-                            {user && (
-                                <View className="space-y-4">
-                                    {canRSVP && (
-                                        <TouchableOpacity
-                                            onPress={handleRSVP}
-                                            disabled={rsvping}
-                                            className="rounded-2xl overflow-hidden"
-                                        >
-                                            <LinearGradient
-                                                colors={isRSVPd ? ['#1F2937', '#111827'] : ['#3B82F6', '#2563EB']}
-                                                className="py-4 items-center justify-center"
-                                                style={{ opacity: rsvping ? 0.8 : 1 }}
-                                            >
-                                                {rsvping ? (
-                                                    <ActivityIndicator size="small" color="#FFFFFF" />
-                                                ) : (
-                                                    <Text className={`font-bold text-lg ${isRSVPd ? 'text-gray-400' : 'text-white'}`}>
-                                                        {isRSVPd ? 'Cancel RSVP' : 'RSVP Now'}
-                                                    </Text>
-                                                )}
-                                            </LinearGradient>
-                                        </TouchableOpacity>
-                                    )}
-
-                                    {isPast && isRSVPd && (
-                                        <TouchableOpacity
-                                            onPress={() => router.push({
-                                                pathname: '/(student)/feedback',
-                                                params: { eventId: event.id, eventTitle: event.title }
-                                            })}
-                                            className="rounded-2xl py-4 items-center justify-center border border-purple-500/30 bg-purple-500/10"
-                                        >
-                                            <View className="flex-row items-center">
-                                                <FontAwesome name="star" size={18} color="#A855F7" />
-                                                <Text className="text-purple-400 font-bold text-lg ml-2">
-                                                    Rate & Review
-                                                </Text>
-                                            </View>
-                                        </TouchableOpacity>
-                                    )}
-                                </View>
-                            )}
-
-                            {!user && (
-                                <View className="p-6 items-center bg-blue-500/10 border border-blue-500/20 rounded-2xl">
-                                    <Text className="text-blue-300 text-center font-medium">
-                                        Sign in to RSVP and join this event
+                                <View style={styles.detailContent}>
+                                    <Text style={styles.detailLabel}>
+                                        {isRescheduled ? 'Original Date & Time' : 'Date & Time'}
+                                    </Text>
+                                    <Text style={styles.detailValue}>
+                                        {formatEventDate(event.date)}
                                     </Text>
                                 </View>
+                            </View>
+                            <View style={styles.divider} />
+                            <View style={styles.detailRow}>
+                                <View style={styles.iconContainer}>
+                                    <FontAwesome name="map-marker" size={20} color={Theme.colors.accent.red} />
+                                </View>
+                                <View style={styles.detailContent}>
+                                    <Text style={styles.detailLabel}>Location</Text>
+                                    <Text style={styles.detailValue} numberOfLines={2}>
+                                        {event.location}
+                                    </Text>
+                                </View>
+                            </View>
+                        </PremiumGlassCard>
+
+                        {/* Stats Grid */}
+                        <View style={styles.statsGrid}>
+                            <PremiumGlassCard intensity={15} style={styles.statCard}>
+                                <FontAwesome name="users" size={24} color={Theme.colors.accent.blue} />
+                                <Text style={styles.statValue}>{event.rsvpCount || 0}</Text>
+                                <Text style={styles.statLabel}>Attending</Text>
+                            </PremiumGlassCard>
+                            {event.category && (
+                                <PremiumGlassCard intensity={15} style={styles.statCard}>
+                                    <FontAwesome name="tag" size={24} color={Theme.colors.accent.purple} />
+                                    <Text style={styles.statValue} numberOfLines={1}>
+                                        {event.category}
+                                    </Text>
+                                    <Text style={styles.statLabel}>Category</Text>
+                                </PremiumGlassCard>
                             )}
                         </View>
-                    </View>
+
+                        {/* About Event */}
+                        <View style={styles.aboutSection}>
+                            <Text style={styles.aboutTitle}>About Event</Text>
+                            <Text style={styles.aboutText}>
+                                {event.description}
+                            </Text>
+                        </View>
+
+                        {/* Action Buttons */}
+                        {user && canRSVP && (
+                            <TouchableOpacity
+                                onPress={handleRSVP}
+                                disabled={rsvping}
+                                style={styles.rsvpButton}
+                                activeOpacity={0.8}
+                            >
+                                <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                                <LinearGradient
+                                    colors={isRSVPd 
+                                        ? ['#1F2937', '#111827'] 
+                                        : [Theme.colors.accent.blue, Theme.colors.accent.blueLight]
+                                    }
+                                    style={StyleSheet.absoluteFill}
+                                />
+                                {rsvping ? (
+                                    <ActivityIndicator size="small" color={Theme.colors.text.primary} />
+                                ) : (
+                                    <Text style={styles.rsvpButtonText}>
+                                        {isRSVPd ? 'Cancel RSVP' : 'RSVP Now'}
+                                    </Text>
+                                )}
+                            </TouchableOpacity>
+                        )}
+
+                        {isPast && isRSVPd && (
+                            <TouchableOpacity
+                                onPress={() => router.push({
+                                    pathname: '/(student)/feedback',
+                                    params: { eventId: event.id, eventTitle: event.title }
+                                })}
+                                style={styles.feedbackButton}
+                                activeOpacity={0.8}
+                            >
+                                <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFill} />
+                                <LinearGradient
+                                    colors={[hexToRgba(Theme.colors.accent.purple, 0.3), hexToRgba(Theme.colors.accent.purple, 0.1)]}
+                                    style={StyleSheet.absoluteFill}
+                                />
+                                <FontAwesome name="star" size={20} color={Theme.colors.accent.purpleLight} />
+                                <Text style={styles.feedbackButtonText}>Rate & Review</Text>
+                            </TouchableOpacity>
+                        )}
+
+                        {!user && (
+                            <View style={styles.loginPrompt}>
+                                <Text style={styles.loginPromptText}>
+                                    Sign in to RSVP and join this event
+                                </Text>
+                            </View>
+                        )}
+                    </PremiumGlassCard>
                 </View>
             </ScrollView>
-        </View>
+        </ScreenWrapper>
     );
 }
 
+const styles = StyleSheet.create({
+    scrollView: {
+        flex: 1,
+    },
+    imageContainer: {
+        width: '100%',
+        height: 320,
+        position: 'relative',
+    },
+    image: {
+        width: '100%',
+        height: '100%',
+    },
+    imageOverlay: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: '40%',
+    },
+    content: {
+        paddingHorizontal: Theme.layout.padding.horizontal,
+        paddingTop: Theme.spacing.xxl,
+        paddingBottom: 120,
+    },
+    titleRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: Theme.spacing.xl,
+        gap: Theme.spacing.md,
+    },
+    title: {
+        flex: 1,
+        fontSize: Theme.typography.fontSize['3xl'],
+        fontWeight: '700',
+        color: Theme.colors.text.primary,
+        lineHeight: Theme.typography.fontSize['3xl'] * Theme.typography.lineHeight.tight,
+        marginRight: Theme.spacing.sm,
+    },
+    badgeContainer: {
+        marginTop: Theme.spacing.xs,
+        flexShrink: 0,
+    },
+    rescheduledNotice: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: hexToRgba(Theme.colors.accent.orange, 0.2),
+        borderWidth: 1,
+        borderColor: hexToRgba(Theme.colors.accent.orange, 0.5),
+        borderRadius: Theme.radius.md,
+        padding: Theme.spacing.md,
+        marginBottom: Theme.spacing.lg,
+        gap: Theme.spacing.sm,
+    },
+    rescheduledText: {
+        flex: 1,
+        fontSize: Theme.typography.fontSize.sm,
+        color: Theme.colors.accent.orange,
+        fontWeight: '600',
+    },
+    detailsCard: {
+        marginBottom: Theme.spacing.xl,
+        padding: Theme.spacing.lg,
+    },
+    detailRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        marginBottom: Theme.spacing.lg,
+    },
+    iconContainer: {
+        width: 44,
+        height: 44,
+        borderRadius: Theme.radius.md,
+        backgroundColor: Theme.colors.glass.dark,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: Theme.spacing.md,
+    },
+    detailContent: {
+        flex: 1,
+    },
+    detailLabel: {
+        fontSize: Theme.typography.fontSize.xs,
+        fontWeight: '600',
+        color: Theme.colors.text.muted,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginBottom: Theme.spacing.xs,
+    },
+    detailValue: {
+        fontSize: Theme.typography.fontSize.base,
+        fontWeight: '600',
+        color: Theme.colors.text.primary,
+        lineHeight: Theme.typography.fontSize.base * Theme.typography.lineHeight.normal,
+    },
+    divider: {
+        height: 1,
+        backgroundColor: Theme.colors.glass.borderLight,
+        marginBottom: Theme.spacing.lg,
+    },
+    statsGrid: {
+        flexDirection: 'row',
+        gap: Theme.spacing.md,
+        marginBottom: Theme.spacing.xl,
+    },
+    statCard: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: Theme.spacing.lg,
+    },
+    statValue: {
+        fontSize: Theme.typography.fontSize['2xl'],
+        fontWeight: '700',
+        color: Theme.colors.text.primary,
+        marginTop: Theme.spacing.md,
+        marginBottom: Theme.spacing.xs,
+    },
+    statLabel: {
+        fontSize: Theme.typography.fontSize.xs,
+        fontWeight: '600',
+        color: Theme.colors.text.muted,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    aboutSection: {
+        marginBottom: Theme.spacing.xl,
+    },
+    aboutTitle: {
+        fontSize: Theme.typography.fontSize.xl,
+        fontWeight: '700',
+        color: Theme.colors.text.primary,
+        marginBottom: Theme.spacing.md,
+    },
+    aboutText: {
+        fontSize: Theme.typography.fontSize.base,
+        fontWeight: '500',
+        color: Theme.colors.text.secondary,
+        lineHeight: Theme.typography.fontSize.base * Theme.typography.lineHeight.relaxed,
+    },
+    rsvpButton: {
+        height: 56,
+        borderRadius: Theme.radius.full,
+        overflow: 'hidden',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: Theme.spacing.md,
+        ...Theme.shadows.md,
+    },
+    rsvpButtonText: {
+        fontSize: Theme.typography.fontSize.lg,
+        fontWeight: '700',
+        color: Theme.colors.text.primary,
+    },
+    feedbackButton: {
+        height: 56,
+        borderRadius: Theme.radius.full,
+        overflow: 'hidden',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: Theme.spacing.sm,
+        borderWidth: 1,
+        borderColor: hexToRgba(Theme.colors.accent.purple, 0.5),
+        marginBottom: Theme.spacing.md,
+    },
+    feedbackButtonText: {
+        fontSize: Theme.typography.fontSize.lg,
+        fontWeight: '700',
+        color: Theme.colors.accent.purpleLight,
+    },
+    loginPrompt: {
+        padding: Theme.spacing.lg,
+        backgroundColor: hexToRgba(Theme.colors.accent.blue, 0.2),
+        borderWidth: 1,
+        borderColor: hexToRgba(Theme.colors.accent.blue, 0.5),
+        borderRadius: Theme.radius.xl,
+        alignItems: 'center',
+    },
+    loginPromptText: {
+        fontSize: Theme.typography.fontSize.base,
+        fontWeight: '500',
+        color: Theme.colors.accent.blue,
+        textAlign: 'center',
+    },
+    errorText: {
+        fontSize: Theme.typography.fontSize.lg,
+        fontWeight: '600',
+        color: Theme.colors.text.muted,
+        marginTop: Theme.spacing.lg,
+        textAlign: 'center',
+    },
+    errorButton: {
+        marginTop: Theme.spacing.xl,
+        paddingHorizontal: Theme.spacing.xl,
+        paddingVertical: Theme.spacing.md,
+        borderRadius: Theme.radius.full,
+        backgroundColor: Theme.colors.accent.blue,
+    },
+    errorButtonText: {
+        fontSize: Theme.typography.fontSize.base,
+        fontWeight: '700',
+        color: Theme.colors.text.primary,
+    },
+});

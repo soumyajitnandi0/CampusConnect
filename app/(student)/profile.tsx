@@ -1,14 +1,16 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { GlassButton } from '../../components/ui/GlassButton';
-import { GlassContainer } from '../../components/ui/GlassContainer';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ScreenWrapper } from '../../components/ui/ScreenWrapper';
+import { Theme } from '../../constants/theme';
 import api from '../../services/api';
 import { EventService } from '../../services/event.service';
 import { supabase } from '../../services/supabase';
 import { Event } from '../../types/models';
+import { hexToRgba } from '../../utils/colorUtils';
 import { formatEventDate, isEventPast } from '../../utils/event.utils';
 import { storage } from "../../utils/storage";
 
@@ -27,7 +29,6 @@ export default function ProfileScreen() {
                     const parsedUser = JSON.parse(userData);
                     setUser(parsedUser);
                     
-                    // Load upcoming RSVPs if user is a student
                     if (parsedUser.role === 'student' && parsedUser.id) {
                         loadUpcomingRSVPs(parsedUser.id);
                     }
@@ -52,7 +53,6 @@ export default function ProfileScreen() {
                 return;
             }
 
-            // Fetch RSVPs with populated event data
             const response = await api.get(`/rsvps/user/${userId}`, {
                 headers: {
                     'x-auth-token': token,
@@ -61,7 +61,6 @@ export default function ProfileScreen() {
 
             const rsvpsData = response.data;
             
-            // Filter for upcoming events with status 'going' and extract event data
             const upcomingEvents = rsvpsData
                 .filter((rsvp: any) => rsvp.status === 'going' && rsvp.event)
                 .map((rsvp: any) => {
@@ -74,7 +73,7 @@ export default function ProfileScreen() {
                 })
                 .filter((event: Event) => !isEventPast(event))
                 .sort((a: Event, b: Event) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                .slice(0, 5); // Limit to 5 upcoming events
+                .slice(0, 5);
             
             setUpcomingRSVPs(upcomingEvents);
         } catch (error) {
@@ -86,18 +85,12 @@ export default function ProfileScreen() {
 
     const handleLogout = async () => {
         try {
-            // Sign out from Supabase if session exists
             await supabase.auth.signOut();
-
-            // Clear local storage
             await storage.removeItem('token');
             await storage.removeItem('user');
-
-            // Navigate to login
             router.replace('/(auth)/login');
         } catch (error) {
             console.error('Logout error:', error);
-            // Still clear local storage and navigate even if Supabase signout fails
             await storage.removeItem('token');
             await storage.removeItem('user');
             router.replace('/(auth)/login');
@@ -107,7 +100,7 @@ export default function ProfileScreen() {
     if (loading) {
         return (
             <ScreenWrapper className="justify-center items-center">
-                <ActivityIndicator size="large" color="#FFFFFF" />
+                <ActivityIndicator size="large" color={Theme.colors.text.primary} />
             </ScreenWrapper>
         );
     }
@@ -115,7 +108,7 @@ export default function ProfileScreen() {
     if (!user) {
         return (
             <ScreenWrapper className="justify-center items-center">
-                <Text className="text-gray-400">No user data</Text>
+                <Text style={styles.errorText}>No user data</Text>
             </ScreenWrapper>
         );
     }
@@ -123,190 +116,453 @@ export default function ProfileScreen() {
     return (
         <ScreenWrapper>
             <ScrollView
-                className="flex-1"
-                contentContainerStyle={{ flexGrow: 1 }}
+                style={styles.container}
+                contentContainerStyle={styles.contentContainer}
             >
-                <View className="p-6 pt-16 w-full max-w-md self-center">
+                <View style={styles.content}>
                     {/* Profile Header */}
-                    <View className="items-center mb-10">
-                        <View className="relative">
-                            <GlassContainer className="w-32 h-32 rounded-full justify-center items-center mb-4 p-0 border-2 border-white/20" intensity={40}>
-                                <Text className="text-6xl text-white font-bold">
+                    <View style={styles.profileHeader}>
+                        <View style={styles.avatarContainer}>
+                            <View style={styles.avatar}>
+                                <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
+                                <LinearGradient
+                                    colors={[hexToRgba(Theme.colors.accent.purple, 0.3), hexToRgba(Theme.colors.accent.blue, 0.2)]}
+                                    style={StyleSheet.absoluteFill}
+                                />
+                                <Text style={styles.avatarText}>
                                     {user.name.charAt(0).toUpperCase()}
                                 </Text>
-                            </GlassContainer>
-                            <View className="absolute bottom-4 right-0 w-8 h-8 bg-green-500 rounded-full border-4 border-black" />
+                            </View>
+                            <View style={styles.statusIndicator} />
                         </View>
 
-                        <Text className="text-3xl font-bold text-white mb-1 text-center">{user.name}</Text>
-                        <Text className="text-gray-400 mb-3 text-center text-base">{user.email}</Text>
+                        <Text style={styles.userName}>{user.name}</Text>
+                        <Text style={styles.userEmail}>{user.email}</Text>
 
-                        <View className="px-6 py-1.5 rounded-full bg-white/10 border border-white/20">
-                            <Text className="text-white font-semibold text-sm capitalize tracking-wide">
-                                {user.role}
+                        <View style={styles.roleBadge}>
+                            <Text style={styles.roleText}>
+                                {user.role.toUpperCase()}
                             </Text>
                         </View>
                     </View>
 
-                    {/* Student Details Card */}
+                    {/* Academic Details Card */}
                     {user.role === 'student' && user.rollNo && (
-                        <GlassContainer className="mb-8 p-0 overflow-hidden" intensity={25}>
-                            <View className="p-5 border-b border-white/5 bg-white/5">
-                                <View className="flex-row items-center">
-                                    <View className="w-10 h-10 rounded-full justify-center items-center mr-4 bg-blue-500/20">
-                                        <FontAwesome name="graduation-cap" size={20} color="#60A5FA" />
-                                    </View>
-                                    <View>
-                                        <Text className="text-lg font-bold text-white">Academic Details</Text>
-                                        <Text className="text-gray-400 text-xs">Student Information</Text>
-                                    </View>
+                        <View style={styles.card}>
+                            <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+                            <View style={styles.cardHeader}>
+                                <View style={styles.cardHeaderIcon}>
+                                    <FontAwesome name="graduation-cap" size={20} color={Theme.colors.accent.blue} />
+                                </View>
+                                <View style={styles.cardHeaderText}>
+                                    <Text style={styles.cardTitle}>Academic Details</Text>
+                                    <Text style={styles.cardSubtitle}>Student Information</Text>
                                 </View>
                             </View>
 
-                            <View className="p-5 space-y-5">
-                                <View className="flex-row items-center justify-between">
-                                    <View className="flex-row items-center">
-                                        <View className="w-8 items-center">
-                                            <FontAwesome name="id-card" size={16} color="#9CA3AF" />
-                                        </View>
-                                        <Text className="text-gray-300 ml-2">Roll Number</Text>
+                            <View style={styles.cardContent}>
+                                <View style={styles.detailRow}>
+                                    <View style={styles.detailLeft}>
+                                        <FontAwesome name="id-card" size={16} color={Theme.colors.text.muted} />
+                                        <Text style={styles.detailLabel}>Roll Number</Text>
                                     </View>
-                                    <Text className="text-white font-bold text-base">
+                                    <Text style={styles.detailValue}>
                                         {user.rollNo || 'Not set'}
                                     </Text>
                                 </View>
 
-                                <View className="h-[1px] bg-white/5" />
+                                <View style={styles.divider} />
 
-                                <View className="flex-row items-center justify-between">
-                                    <View className="flex-row items-center">
-                                        <View className="w-8 items-center">
-                                            <FontAwesome name="calendar" size={16} color="#9CA3AF" />
-                                        </View>
-                                        <Text className="text-gray-300 ml-2">Year & Section</Text>
+                                <View style={styles.detailRow}>
+                                    <View style={styles.detailLeft}>
+                                        <FontAwesome name="calendar" size={16} color={Theme.colors.text.muted} />
+                                        <Text style={styles.detailLabel}>Year & Section</Text>
                                     </View>
-                                    <Text className="text-white font-bold text-base">
+                                    <Text style={styles.detailValue}>
                                         {user.yearSection || 'Not set'}
                                     </Text>
                                 </View>
                             </View>
-                        </GlassContainer>
+                        </View>
                     )}
 
                     {/* Upcoming RSVPs Section */}
                     {user.role === 'student' && (
-                        <GlassContainer className="mb-8 p-0 overflow-hidden" intensity={25}>
-                            <View className="p-5 border-b border-white/5 bg-white/5">
-                                <View className="flex-row items-center justify-between">
-                                    <View className="flex-row items-center">
-                                        <View className="w-10 h-10 rounded-full justify-center items-center mr-4 bg-purple-500/20">
-                                            <FontAwesome name="calendar-check-o" size={20} color="#A855F7" />
-                                        </View>
-                                        <View>
-                                            <Text className="text-lg font-bold text-white">Upcoming RSVPs</Text>
-                                            <Text className="text-gray-400 text-xs">Events you're attending</Text>
-                                        </View>
+                        <View style={styles.card}>
+                            <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+                            <View style={styles.cardHeader}>
+                                <View style={styles.cardHeaderLeft}>
+                                    <View style={[styles.cardHeaderIcon, { backgroundColor: Theme.colors.accent.purple + '20' }]}>
+                                        <FontAwesome name="calendar-check-o" size={20} color={Theme.colors.accent.purpleLight} />
                                     </View>
-                                    <TouchableOpacity
-                                        onPress={() => user && user.id && loadUpcomingRSVPs(user.id)}
-                                        disabled={loadingRSVPs}
-                                        className="w-10 h-10 rounded-full items-center justify-center bg-purple-500/20 border border-purple-500/30"
-                                    >
-                                        {loadingRSVPs ? (
-                                            <ActivityIndicator size="small" color="#A855F7" />
-                                        ) : (
-                                            <FontAwesome name="refresh" size={16} color="#A855F7" />
-                                        )}
-                                    </TouchableOpacity>
+                                    <View style={styles.cardHeaderText}>
+                                        <Text style={styles.cardTitle}>Upcoming RSVPs</Text>
+                                        <Text style={styles.cardSubtitle}>Events you're attending</Text>
+                                    </View>
                                 </View>
+                                <TouchableOpacity
+                                    onPress={() => user && user.id && loadUpcomingRSVPs(user.id)}
+                                    disabled={loadingRSVPs}
+                                    style={styles.refreshButton}
+                                    activeOpacity={0.7}
+                                >
+                                    {loadingRSVPs ? (
+                                        <ActivityIndicator size="small" color={Theme.colors.accent.purpleLight} />
+                                    ) : (
+                                        <FontAwesome name="refresh" size={16} color={Theme.colors.accent.purpleLight} />
+                                    )}
+                                </TouchableOpacity>
                             </View>
 
-                            <View className="p-5 pt-4">
+                            <View style={styles.cardContent}>
                                 {loadingRSVPs ? (
-                                    <View className="py-8 items-center">
-                                        <ActivityIndicator size="small" color="#A855F7" />
-                                        <Text className="text-gray-400 text-sm mt-2">Loading events...</Text>
+                                    <View style={styles.loadingContainer}>
+                                        <ActivityIndicator size="small" color={Theme.colors.accent.purpleLight} />
+                                        <Text style={styles.loadingText}>Loading events...</Text>
                                     </View>
                                 ) : upcomingRSVPs.length > 0 ? (
-                                    <View>
+                                    <View style={styles.rsvpList}>
                                         {upcomingRSVPs.map((event) => (
-                                            <View key={event.id} className="mb-3 last:mb-0">
-                                                <GlassContainer className="p-4" intensity={20}>
-                                                    <View className="flex-row items-center">
-                                                        <TouchableOpacity
-                                                            onPress={() => router.push({
-                                                                pathname: '/event/[id]',
-                                                                params: { id: event.id }
-                                                            })}
-                                                            className="flex-1 mr-3"
-                                                            activeOpacity={0.7}
-                                                        >
-                                                            <View>
-                                                                <Text className="text-white font-bold text-base mb-2" numberOfLines={2}>
-                                                                    {event.title}
+                                            <View key={event.id} style={styles.rsvpCard}>
+                                                <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFill} />
+                                                <View style={styles.rsvpContent}>
+                                                    <TouchableOpacity
+                                                        onPress={() => router.push({
+                                                            pathname: '/event/[id]',
+                                                            params: { id: event.id }
+                                                        })}
+                                                        style={styles.rsvpInfo}
+                                                        activeOpacity={0.7}
+                                                    >
+                                                        <Text style={styles.rsvpTitle} numberOfLines={2}>
+                                                            {event.title}
+                                                        </Text>
+                                                        <View style={styles.rsvpDetails}>
+                                                            <View style={styles.rsvpDetailRow}>
+                                                                <FontAwesome name="calendar" size={11} color={Theme.colors.text.muted} />
+                                                                <Text style={styles.rsvpDetailText}>
+                                                                    {formatEventDate(event.date)}
                                                                 </Text>
-                                                                <View className="flex-row items-center mb-1.5">
-                                                                    <View className="w-4 items-center">
-                                                                        <FontAwesome name="calendar" size={11} color="#9CA3AF" />
-                                                                    </View>
-                                                                    <Text className="text-gray-400 text-xs ml-2 flex-1">
-                                                                        {formatEventDate(event.date)}
+                                                            </View>
+                                                            {event.location && (
+                                                                <View style={styles.rsvpDetailRow}>
+                                                                    <FontAwesome name="map-marker" size={11} color={Theme.colors.text.muted} />
+                                                                    <Text style={styles.rsvpDetailText} numberOfLines={1}>
+                                                                        {event.location}
                                                                     </Text>
                                                                 </View>
-                                                                {event.location && (
-                                                                    <View className="flex-row items-center">
-                                                                        <View className="w-4 items-center">
-                                                                            <FontAwesome name="map-marker" size={11} color="#9CA3AF" />
-                                                                        </View>
-                                                                        <Text className="text-gray-400 text-xs ml-2 flex-1" numberOfLines={1}>
-                                                                            {event.location}
-                                                                        </Text>
-                                                                    </View>
-                                                                )}
-                                                            </View>
-                                                        </TouchableOpacity>
-                                                        <TouchableOpacity
-                                                            onPress={() => router.push({
-                                                                pathname: '/qr-code/[eventId]',
-                                                                params: { eventId: event.id }
-                                                            })}
-                                                            className="px-4 py-3 rounded-xl bg-blue-500/20 border border-blue-500/30 items-center justify-center min-w-[60px]"
-                                                            activeOpacity={0.7}
-                                                        >
-                                                            <FontAwesome name="qrcode" size={20} color="#60A5FA" />
-                                                            <Text className="text-blue-400 text-[10px] mt-1 font-bold">QR</Text>
-                                                        </TouchableOpacity>
-                                                    </View>
-                                                </GlassContainer>
+                                                            )}
+                                                        </View>
+                                                    </TouchableOpacity>
+                                                    <TouchableOpacity
+                                                        onPress={() => router.push({
+                                                            pathname: '/qr-code/[eventId]',
+                                                            params: { eventId: event.id }
+                                                        })}
+                                                        style={styles.qrButton}
+                                                        activeOpacity={0.7}
+                                                    >
+                                                        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                                                        <LinearGradient
+                                                            colors={[hexToRgba(Theme.colors.accent.blue, 0.3), hexToRgba(Theme.colors.accent.blue, 0.1)]}
+                                                            style={StyleSheet.absoluteFill}
+                                                        />
+                                                        <FontAwesome name="qrcode" size={20} color={Theme.colors.accent.blue} />
+                                                        <Text style={styles.qrButtonText}>QR</Text>
+                                                    </TouchableOpacity>
+                                                </View>
                                             </View>
                                         ))}
                                     </View>
                                 ) : (
-                                    <View className="py-8 items-center">
-                                        <FontAwesome name="calendar-times-o" size={32} color="#4B5563" />
-                                        <Text className="text-gray-400 text-sm mt-2 text-center">
-                                            No upcoming events
-                                        </Text>
-                                        <Text className="text-gray-500 text-xs mt-1 text-center">
+                                    <View style={styles.emptyRSVP}>
+                                        <FontAwesome name="calendar-times-o" size={40} color={Theme.colors.text.disabled} />
+                                        <Text style={styles.emptyRSVPText}>No upcoming events</Text>
+                                        <Text style={styles.emptyRSVPSubtext}>
                                             RSVP to events to see them here
                                         </Text>
                                     </View>
                                 )}
                             </View>
-                        </GlassContainer>
+                        </View>
                     )}
 
                     {/* Logout Button */}
-                    <GlassButton
-                        title="Sign Out"
+                    <TouchableOpacity
+                        style={styles.logoutButton}
                         onPress={handleLogout}
-                        variant="outline"
-                        className="mt-auto mb-6 border-red-500/30 bg-red-500/5 active:bg-red-500/20"
-                        textClassName="text-red-400 font-bold"
-                        icon={<FontAwesome name="sign-out" size={18} color="#F87171" style={{ marginRight: 10 }} />}
-                    />
+                        activeOpacity={0.7}
+                    >
+                        <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFill} />
+                        <LinearGradient
+                            colors={[hexToRgba(Theme.colors.accent.red, 0.2), hexToRgba(Theme.colors.accent.red, 0.1)]}
+                            style={StyleSheet.absoluteFill}
+                        />
+                        <FontAwesome name="sign-out" size={18} color={Theme.colors.accent.red} />
+                        <Text style={styles.logoutText}>Sign Out</Text>
+                    </TouchableOpacity>
                 </View>
             </ScrollView>
         </ScreenWrapper>
     );
 }
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+    },
+    contentContainer: {
+        paddingBottom: 120,
+    },
+    content: {
+        paddingHorizontal: Theme.layout.padding.horizontal,
+        paddingTop: Theme.spacing.xxxl,
+        maxWidth: 500,
+        alignSelf: 'center',
+        width: '100%',
+    },
+    profileHeader: {
+        alignItems: 'center',
+        marginBottom: Theme.spacing.xxxl,
+    },
+    avatarContainer: {
+        position: 'relative',
+        marginBottom: Theme.spacing.lg,
+    },
+    avatar: {
+        width: 120,
+        height: 120,
+        borderRadius: Theme.radius.full,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 2,
+        borderColor: Theme.colors.glass.border,
+        overflow: 'hidden',
+        ...Theme.shadows.lg,
+    },
+    avatarText: {
+        fontSize: 48,
+        fontWeight: '700',
+        color: Theme.colors.text.primary,
+    },
+    statusIndicator: {
+        position: 'absolute',
+        bottom: 4,
+        right: 4,
+        width: 24,
+        height: 24,
+        borderRadius: Theme.radius.full,
+        backgroundColor: Theme.colors.accent.green,
+        borderWidth: 4,
+        borderColor: Theme.colors.background.primary,
+    },
+    userName: {
+        fontSize: Theme.typography.fontSize['3xl'],
+        fontWeight: '700',
+        color: Theme.colors.text.primary,
+        marginBottom: Theme.spacing.xs,
+        textAlign: 'center',
+    },
+    userEmail: {
+        fontSize: Theme.typography.fontSize.base,
+        color: Theme.colors.text.muted,
+        marginBottom: Theme.spacing.md,
+        textAlign: 'center',
+    },
+    roleBadge: {
+        paddingHorizontal: Theme.spacing.xl,
+        paddingVertical: Theme.spacing.sm,
+        borderRadius: Theme.radius.full,
+        backgroundColor: Theme.colors.glass.medium,
+        borderWidth: 1,
+        borderColor: Theme.colors.glass.border,
+    },
+    roleText: {
+        fontSize: Theme.typography.fontSize.sm,
+        fontWeight: '700',
+        color: Theme.colors.text.primary,
+        letterSpacing: 1,
+    },
+    card: {
+        borderRadius: Theme.radius.xl,
+        overflow: 'hidden',
+        backgroundColor: Theme.colors.glass.medium,
+        borderWidth: 1,
+        borderColor: Theme.colors.glass.border,
+        marginBottom: Theme.spacing.xl,
+        ...Theme.shadows.md,
+    },
+    cardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: Theme.layout.cardPadding.vertical,
+        borderBottomWidth: 1,
+        borderBottomColor: Theme.colors.glass.borderLight,
+        backgroundColor: Theme.colors.glass.dark,
+    },
+    cardHeaderLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    cardHeaderIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: Theme.radius.md,
+        backgroundColor: Theme.colors.accent.blue + '20',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: Theme.spacing.md,
+    },
+    cardHeaderText: {
+        flex: 1,
+    },
+    cardTitle: {
+        fontSize: Theme.typography.fontSize.lg,
+        fontWeight: '700',
+        color: Theme.colors.text.primary,
+        marginBottom: Theme.spacing.xs,
+    },
+    cardSubtitle: {
+        fontSize: Theme.typography.fontSize.xs,
+        color: Theme.colors.text.muted,
+    },
+    refreshButton: {
+        width: 40,
+        height: 40,
+        borderRadius: Theme.radius.md,
+        backgroundColor: Theme.colors.accent.purple + '20',
+        borderWidth: 1,
+        borderColor: Theme.colors.accent.purple + '40',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    cardContent: {
+        padding: Theme.layout.cardPadding.vertical,
+    },
+    detailRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: Theme.spacing.lg,
+    },
+    detailLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Theme.spacing.sm,
+    },
+    detailLabel: {
+        fontSize: Theme.typography.fontSize.base,
+        color: Theme.colors.text.tertiary,
+    },
+    detailValue: {
+        fontSize: Theme.typography.fontSize.base,
+        fontWeight: '700',
+        color: Theme.colors.text.primary,
+    },
+    divider: {
+        height: 1,
+        backgroundColor: Theme.colors.glass.borderLight,
+        marginBottom: Theme.spacing.lg,
+    },
+    loadingContainer: {
+        alignItems: 'center',
+        paddingVertical: Theme.spacing.xxl,
+    },
+    loadingText: {
+        marginTop: Theme.spacing.md,
+        fontSize: Theme.typography.fontSize.sm,
+        color: Theme.colors.text.muted,
+    },
+    rsvpList: {
+        gap: Theme.spacing.md,
+    },
+    rsvpCard: {
+        borderRadius: Theme.radius.lg,
+        overflow: 'hidden',
+        backgroundColor: Theme.colors.glass.dark,
+        borderWidth: 1,
+        borderColor: Theme.colors.glass.borderLight,
+    },
+    rsvpContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: Theme.spacing.md,
+    },
+    rsvpInfo: {
+        flex: 1,
+        marginRight: Theme.spacing.md,
+    },
+    rsvpTitle: {
+        fontSize: Theme.typography.fontSize.base,
+        fontWeight: '700',
+        color: Theme.colors.text.primary,
+        marginBottom: Theme.spacing.sm,
+    },
+    rsvpDetails: {
+        gap: Theme.spacing.xs,
+    },
+    rsvpDetailRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Theme.spacing.xs,
+    },
+    rsvpDetailText: {
+        flex: 1,
+        fontSize: Theme.typography.fontSize.xs,
+        color: Theme.colors.text.muted,
+    },
+    qrButton: {
+        width: 60,
+        height: 60,
+        borderRadius: Theme.radius.md,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: Theme.colors.accent.blue + '50',
+        overflow: 'hidden',
+    },
+    qrButtonText: {
+        fontSize: Theme.typography.fontSize.xs,
+        fontWeight: '700',
+        color: Theme.colors.accent.blue,
+        marginTop: 2,
+    },
+    emptyRSVP: {
+        alignItems: 'center',
+        paddingVertical: Theme.spacing.xxl,
+    },
+    emptyRSVPText: {
+        marginTop: Theme.spacing.md,
+        fontSize: Theme.typography.fontSize.sm,
+        color: Theme.colors.text.secondary,
+    },
+    emptyRSVPSubtext: {
+        marginTop: Theme.spacing.xs,
+        fontSize: Theme.typography.fontSize.xs,
+        color: Theme.colors.text.muted,
+    },
+    logoutButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: Theme.spacing.lg,
+        borderRadius: Theme.radius.xl,
+        borderWidth: 1,
+        borderColor: Theme.colors.accent.red + '50',
+        marginTop: Theme.spacing.md,
+        marginBottom: Theme.spacing.xl,
+        overflow: 'hidden',
+        gap: Theme.spacing.sm,
+    },
+    logoutText: {
+        fontSize: Theme.typography.fontSize.base,
+        fontWeight: '700',
+        color: Theme.colors.accent.red,
+    },
+    errorText: {
+        fontSize: Theme.typography.fontSize.base,
+        color: Theme.colors.text.muted,
+    },
+});

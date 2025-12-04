@@ -1,10 +1,11 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { GlassContainer } from '../../components/ui/GlassContainer';
-import { GlassInput } from '../../components/ui/GlassInput';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { EventCard } from '../../components/event-card';
 import { ScreenWrapper } from '../../components/ui/ScreenWrapper';
+import { Theme } from '../../constants/theme';
 import { useEvents } from '../../contexts/events.context';
 import { Event } from '../../types/models';
 
@@ -29,34 +30,17 @@ export default function ExploreScreen() {
         });
     };
 
-    // Get days for the current month view (including padding)
     const getCalendarDays = () => {
         const year = currentMonth.getFullYear();
         const month = currentMonth.getMonth();
 
         const firstDayOfMonth = new Date(year, month, 1);
-        const lastDayOfMonth = new Date(year, month + 1, 0);
+        const startingDayOfWeek = firstDayOfMonth.getDay();
 
-        const daysInMonth = lastDayOfMonth.getDate();
-        const startingDayOfWeek = firstDayOfMonth.getDay(); // 0 = Sunday
-
-        const days: Date[] = [];
-
-        // Add padding for previous month
-        for (let i = 0; i < startingDayOfWeek; i++) {
-            const date = new Date(year, month, -i); // This actually goes back to prev month
-            // Correct way to get prev month days in order:
-            // If startingDayOfWeek is 3 (Wed), we need Sun, Mon, Tue.
-            // i=0 -> last day of prev month (Tue?) No.
-            // Let's do it simpler.
-        }
-
-        // Re-do padding logic
-        // Start date of the grid
         const startDate = new Date(firstDayOfMonth);
         startDate.setDate(startDate.getDate() - startingDayOfWeek);
 
-        // We want 6 weeks to cover all possibilities (42 days)
+        const days: Date[] = [];
         for (let i = 0; i < 42; i++) {
             const date = new Date(startDate);
             date.setDate(startDate.getDate() + i);
@@ -68,11 +52,9 @@ export default function ExploreScreen() {
 
     const calendarDays = useMemo(() => getCalendarDays(), [currentMonth]);
 
-    // Filter and sort events
     const filteredEvents = useMemo(() => {
         let filtered = events;
 
-        // Filter by search query
         if (searchQuery) {
             const query = searchQuery.toLowerCase();
             filtered = filtered.filter(event =>
@@ -82,7 +64,6 @@ export default function ExploreScreen() {
             );
         }
 
-        // Filter by selected date
         filtered = filtered.filter(event => {
             const eventDate = new Date(event.date);
             eventDate.setHours(0, 0, 0, 0);
@@ -91,7 +72,6 @@ export default function ExploreScreen() {
             return eventDate.getTime() === selected.getTime();
         });
 
-        // Sort by time
         return filtered.sort((a, b) => {
             const dateA = new Date(a.date).getTime();
             const dateB = new Date(b.date).getTime();
@@ -99,7 +79,6 @@ export default function ExploreScreen() {
         });
     }, [events, searchQuery, selectedDate]);
 
-    // Group events by date for dot indicators
     const eventsByDate = useMemo(() => {
         const grouped: { [key: string]: Event[] } = {};
         events.forEach(event => {
@@ -140,7 +119,7 @@ export default function ExploreScreen() {
     if (loading && events.length === 0) {
         return (
             <ScreenWrapper className="justify-center items-center">
-                <ActivityIndicator size="large" color="#FFFFFF" />
+                <ActivityIndicator size="large" color={Theme.colors.text.primary} />
             </ScreenWrapper>
         );
     }
@@ -148,56 +127,58 @@ export default function ExploreScreen() {
     return (
         <ScreenWrapper>
             <ScrollView
-                className="flex-1"
+                style={styles.container}
+                contentContainerStyle={styles.contentContainer}
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        tintColor="#FFFFFF"
+                        tintColor={Theme.colors.text.primary}
                     />
                 }
             >
-                <View className="pt-4 px-6 pb-20 w-full max-w-4xl self-center">
+                <View style={styles.content}>
                     {/* Header */}
-                    <View className="mb-6">
-                        <Text className="text-2xl font-bold text-white mb-4">Explore Events</Text>
-
-                        {/* Search Bar */}
-                        <GlassInput
-                            placeholder="Search events..."
-                            value={searchQuery}
-                            onChangeText={setSearchQuery}
-                            icon="search"
-                            containerStyle={{ marginBottom: 0 }}
-                        />
+                    <View style={styles.header}>
+                        <Text style={styles.headerTitle}>Explore Events</Text>
                     </View>
 
-                    {/* Calendar Section */}
-                    <GlassContainer className="p-3 mb-4" intensity={20}>
+                    {/* Glassy Calendar Container */}
+                    <View style={styles.calendarContainer}>
+                        <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+                        
                         {/* Month Navigation */}
-                        <View className="flex-row justify-between items-center mb-4">
-                            <TouchableOpacity onPress={() => navigateMonth('prev')} className="p-2">
-                                <FontAwesome name="chevron-left" size={14} color="#FFFFFF" />
+                        <View style={styles.monthNavigation}>
+                            <TouchableOpacity 
+                                onPress={() => navigateMonth('prev')} 
+                                style={styles.navButton}
+                                activeOpacity={0.7}
+                            >
+                                <FontAwesome name="chevron-left" size={16} color={Theme.colors.text.primary} />
                             </TouchableOpacity>
-                            <Text className="text-base font-bold text-white">
+                            <Text style={styles.monthText}>
                                 {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                             </Text>
-                            <TouchableOpacity onPress={() => navigateMonth('next')} className="p-2">
-                                <FontAwesome name="chevron-right" size={14} color="#FFFFFF" />
+                            <TouchableOpacity 
+                                onPress={() => navigateMonth('next')} 
+                                style={styles.navButton}
+                                activeOpacity={0.7}
+                            >
+                                <FontAwesome name="chevron-right" size={16} color={Theme.colors.text.primary} />
                             </TouchableOpacity>
                         </View>
 
                         {/* Weekday Headers */}
-                        <View className="flex-row justify-between mb-2">
+                        <View style={styles.weekdayContainer}>
                             {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
-                                <Text key={index} className="text-gray-400 text-[10px] font-bold w-8 text-center">
+                                <Text key={index} style={styles.weekdayText}>
                                     {day}
                                 </Text>
                             ))}
                         </View>
 
                         {/* Calendar Grid */}
-                        <View className="flex-row flex-wrap justify-between">
+                        <View style={styles.calendarGrid}>
                             {calendarDays.map((date, index) => {
                                 const eventCount = getEventsCountForDate(date);
                                 const isCurrentMonth = isSameMonth(date);
@@ -209,121 +190,83 @@ export default function ExploreScreen() {
                                         key={index}
                                         onPress={() => {
                                             setSelectedDate(date);
-                                            // If clicking a date from another month, switch to that month
                                             if (!isCurrentMonth) {
                                                 setCurrentMonth(new Date(date.getFullYear(), date.getMonth(), 1));
                                             }
                                         }}
-                                        className="w-[14%] aspect-square items-center justify-center mb-1"
+                                        style={styles.dayContainer}
+                                        activeOpacity={0.7}
                                     >
-                                        <View
-                                            className={`w-7 h-7 rounded-full items-center justify-center ${selected
-                                                ? 'bg-white'
-                                                : today
-                                                    ? 'bg-white/20 border border-white/30'
-                                                    : 'bg-transparent'
-                                                }`}
-                                        >
-                                            <Text
-                                                className={`text-xs font-medium ${selected
-                                                    ? 'text-black font-bold'
-                                                    : isCurrentMonth
-                                                        ? 'text-white'
-                                                        : 'text-gray-600'
-                                                    }`}
-                                            >
+                                        <View style={[
+                                            styles.dayCircle,
+                                            selected && styles.dayCircleSelected,
+                                            today && !selected && styles.dayCircleToday
+                                        ]}>
+                                            <Text style={[
+                                                styles.dayText,
+                                                selected && styles.dayTextSelected,
+                                                !isCurrentMonth && styles.dayTextOtherMonth
+                                            ]}>
                                                 {date.getDate()}
                                             </Text>
                                         </View>
 
-                                        {/* Event Dots */}
-                                        <View className="flex-row mt-0.5 h-1 space-x-0.5">
-                                            {eventCount > 0 && (
-                                                <View className={`w-0.5 h-0.5 rounded-full ${selected ? 'bg-black' : 'bg-blue-400'}`} />
-                                            )}
-                                            {eventCount > 1 && (
-                                                <View className={`w-0.5 h-0.5 rounded-full ${selected ? 'bg-black' : 'bg-purple-400'}`} />
-                                            )}
-                                            {eventCount > 2 && (
-                                                <View className={`w-0.5 h-0.5 rounded-full ${selected ? 'bg-black' : 'bg-pink-400'}`} />
-                                            )}
-                                        </View>
+                                        {/* Event Indicators */}
+                                        {eventCount > 0 && (
+                                            <View style={styles.eventIndicators}>
+                                                {eventCount > 0 && (
+                                                    <View style={[
+                                                        styles.eventDot,
+                                                        { backgroundColor: Theme.colors.accent.blue }
+                                                    ]} />
+                                                )}
+                                                {eventCount > 1 && (
+                                                    <View style={[
+                                                        styles.eventDot,
+                                                        { backgroundColor: Theme.colors.accent.purple }
+                                                    ]} />
+                                                )}
+                                                {eventCount > 2 && (
+                                                    <View style={[
+                                                        styles.eventDot,
+                                                        { backgroundColor: Theme.colors.accent.green }
+                                                    ]} />
+                                                )}
+                                            </View>
+                                        )}
                                     </TouchableOpacity>
                                 );
                             })}
                         </View>
-                    </GlassContainer>
+                    </View>
 
                     {/* Selected Date Header */}
-                    <View className="mb-4">
-                        <Text className="text-white font-bold text-lg">
+                    <View style={styles.dateHeader}>
+                        <Text style={styles.dateTitle}>
                             {selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
                         </Text>
-                        <Text className="text-gray-400 text-sm">
+                        <Text style={styles.dateSubtitle}>
                             {filteredEvents.length} {filteredEvents.length === 1 ? 'event' : 'events'} scheduled
                         </Text>
                     </View>
 
                     {/* Events List */}
                     {filteredEvents.length > 0 ? (
-                        <View>
+                        <View style={styles.eventsList}>
                             {filteredEvents.map((event) => (
-                                <TouchableOpacity
+                                <EventCard
                                     key={event.id}
+                                    event={event}
                                     onPress={() => handleEventPress(event)}
-                                    className="mb-4"
-                                >
-                                    <GlassContainer className="p-4" intensity={20}>
-                                        <View className="flex-row justify-between items-start mb-2">
-                                            <View className="flex-1 mr-2">
-                                                <Text className="font-bold text-lg text-white mb-1">{event.title}</Text>
-                                                <View className="flex-row items-center">
-                                                    <FontAwesome name="map-marker" size={12} color="#9CA3AF" />
-                                                    <Text className="text-gray-400 text-xs ml-1">{event.location}</Text>
-                                                </View>
-                                            </View>
-                                            <View className="bg-white/10 px-3 py-1 rounded-lg items-center">
-                                                <Text className="text-white font-bold text-xs">
-                                                    {new Date(event.date).toLocaleTimeString('en-US', {
-                                                        hour: 'numeric',
-                                                        minute: '2-digit'
-                                                    })}
-                                                </Text>
-                                            </View>
-                                        </View>
-
-                                        {event.description && (
-                                            <Text className="text-gray-300 text-sm mt-2" numberOfLines={2}>
-                                                {event.description}
-                                            </Text>
-                                        )}
-
-                                        <View className="mt-3 flex-row items-center justify-between">
-                                            <View className="flex-row items-center">
-                                                <FontAwesome name="users" size={12} color="#60A5FA" />
-                                                <Text className="text-blue-400 text-xs ml-1 font-medium">
-                                                    {event.rsvpCount || 0} attending
-                                                </Text>
-                                            </View>
-                                            {event.category && (
-                                                <View className="bg-purple-500/20 px-2 py-0.5 rounded">
-                                                    <Text className="text-purple-300 text-[10px] font-bold uppercase">
-                                                        {event.category}
-                                                    </Text>
-                                                </View>
-                                            )}
-                                        </View>
-                                    </GlassContainer>
-                                </TouchableOpacity>
+                                    showActions={false}
+                                />
                             ))}
                         </View>
                     ) : (
-                        <View className="items-center py-12 bg-white/5 rounded-2xl border border-white/10">
-                            <FontAwesome name="calendar-o" size={48} color="#4B5563" />
-                            <Text className="text-center mt-4 text-gray-300 text-base font-semibold">
-                                No events on this date
-                            </Text>
-                            <Text className="text-center mt-2 text-gray-500 text-sm px-6">
+                        <View style={styles.emptyContainer}>
+                            <FontAwesome name="calendar-o" size={56} color={Theme.colors.text.disabled} />
+                            <Text style={styles.emptyTitle}>No events on this date</Text>
+                            <Text style={styles.emptySubtitle}>
                                 Try selecting a date with dots to see scheduled events.
                             </Text>
                         </View>
@@ -333,3 +276,152 @@ export default function ExploreScreen() {
         </ScreenWrapper>
     );
 }
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+    },
+    contentContainer: {
+        paddingBottom: 120,
+    },
+    content: {
+        paddingHorizontal: Theme.layout.padding.horizontal,
+        paddingTop: Theme.spacing.xxl,
+    },
+    header: {
+        marginBottom: Theme.spacing.xl,
+    },
+    headerTitle: {
+        fontSize: Theme.typography.fontSize['2xl'],
+        fontWeight: '700',
+        color: Theme.colors.text.primary,
+    },
+    calendarContainer: {
+        borderRadius: Theme.radius.xl,
+        overflow: 'hidden',
+        backgroundColor: Theme.colors.glass.medium,
+        borderWidth: 1,
+        borderColor: Theme.colors.glass.border,
+        padding: Theme.spacing.lg,
+        marginBottom: Theme.spacing.xl,
+        ...Theme.shadows.md,
+    },
+    monthNavigation: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: Theme.spacing.lg,
+    },
+    navButton: {
+        width: 36,
+        height: 36,
+        borderRadius: Theme.radius.md,
+        backgroundColor: Theme.colors.glass.dark,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    monthText: {
+        fontSize: Theme.typography.fontSize.lg,
+        fontWeight: '700',
+        color: Theme.colors.text.primary,
+    },
+    weekdayContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: Theme.spacing.md,
+    },
+    weekdayText: {
+        width: '14%',
+        textAlign: 'center',
+        fontSize: Theme.typography.fontSize.xs,
+        fontWeight: '700',
+        color: Theme.colors.text.muted,
+    },
+    calendarGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+    },
+    dayContainer: {
+        width: '14%',
+        aspectRatio: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: Theme.spacing.sm,
+    },
+    dayCircle: {
+        width: 36,
+        height: 36,
+        borderRadius: Theme.radius.full,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    dayCircleSelected: {
+        backgroundColor: Theme.colors.text.primary,
+    },
+    dayCircleToday: {
+        backgroundColor: Theme.colors.glass.medium,
+        borderWidth: 1.5,
+        borderColor: Theme.colors.glass.border,
+    },
+    dayText: {
+        fontSize: Theme.typography.fontSize.sm,
+        fontWeight: '600',
+        color: Theme.colors.text.primary,
+    },
+    dayTextSelected: {
+        color: Theme.colors.background.primary,
+        fontWeight: '700',
+    },
+    dayTextOtherMonth: {
+        color: Theme.colors.text.disabled,
+    },
+    eventIndicators: {
+        flexDirection: 'row',
+        gap: 2,
+        marginTop: 2,
+    },
+    eventDot: {
+        width: 4,
+        height: 4,
+        borderRadius: 2,
+    },
+    dateHeader: {
+        marginBottom: Theme.spacing.lg,
+    },
+    dateTitle: {
+        fontSize: Theme.typography.fontSize.xl,
+        fontWeight: '700',
+        color: Theme.colors.text.primary,
+        marginBottom: Theme.spacing.xs,
+    },
+    dateSubtitle: {
+        fontSize: Theme.typography.fontSize.sm,
+        color: Theme.colors.text.muted,
+    },
+    eventsList: {
+        gap: Theme.spacing.lg,
+    },
+    emptyContainer: {
+        alignItems: 'center',
+        paddingVertical: Theme.spacing.xxxl,
+        backgroundColor: Theme.colors.glass.dark,
+        borderRadius: Theme.radius.xl,
+        borderWidth: 1,
+        borderColor: Theme.colors.glass.borderLight,
+    },
+    emptyTitle: {
+        marginTop: Theme.spacing.lg,
+        fontSize: Theme.typography.fontSize.lg,
+        fontWeight: '600',
+        color: Theme.colors.text.secondary,
+        textAlign: 'center',
+    },
+    emptySubtitle: {
+        marginTop: Theme.spacing.sm,
+        fontSize: Theme.typography.fontSize.sm,
+        color: Theme.colors.text.muted,
+        textAlign: 'center',
+        paddingHorizontal: Theme.spacing.xl,
+    },
+});

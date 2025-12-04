@@ -1,11 +1,14 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
-import { GlassButton } from '../../components/ui/GlassButton';
-import { GlassContainer } from '../../components/ui/GlassContainer';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { PremiumGlassCard } from '../../components/ui/PremiumGlassCard';
 import { ScreenWrapper } from '../../components/ui/ScreenWrapper';
+import { Theme } from '../../constants/theme';
 import { supabase } from '../../services/supabase';
+import { hexToRgba } from '../../utils/colorUtils';
 import { storage } from "../../utils/storage";
 
 export default function ProfileScreen() {
@@ -53,16 +56,16 @@ export default function ProfileScreen() {
 
     if (loading) {
         return (
-            <ScreenWrapper className="justify-center items-center">
-                <ActivityIndicator size="large" color="#FFFFFF" />
+            <ScreenWrapper style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={Theme.colors.accent.purpleLight} />
             </ScreenWrapper>
         );
     }
 
     if (!user) {
         return (
-            <ScreenWrapper className="justify-center items-center">
-                <Text className="text-gray-400">No user data</Text>
+            <ScreenWrapper style={styles.loadingContainer}>
+                <Text style={styles.errorText}>No user data</Text>
             </ScreenWrapper>
         );
     }
@@ -70,52 +73,178 @@ export default function ProfileScreen() {
     return (
         <ScreenWrapper>
             <ScrollView
-                className="flex-1"
-                contentContainerStyle={{ flexGrow: 1 }}
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
             >
-                <View className="p-6 pt-16">
+                <View style={styles.container}>
                     {/* Profile Header */}
-                    <View className="items-center mb-8">
-                        <GlassContainer className="w-28 h-28 rounded-full justify-center items-center mb-4 p-0" intensity={30}>
-                            <Text className="text-5xl text-white font-bold">
+                    <View style={styles.profileHeader}>
+                        <PremiumGlassCard style={styles.avatarContainer} intensity={Theme.blur.medium} gradient>
+                            <Text style={styles.avatarText}>
                                 {user.name.charAt(0).toUpperCase()}
                             </Text>
-                        </GlassContainer>
-                        <Text className="text-3xl font-bold text-white mb-1">{user.name}</Text>
-                        <Text className="text-gray-400 mb-2">{user.email}</Text>
-                        <View className="px-4 py-1 rounded-full mt-1 bg-white/10 border border-white/20">
-                            <Text className="text-white font-semibold text-sm capitalize">
-                                {user.role}
+                        </PremiumGlassCard>
+                        <Text style={styles.userName}>{user.name}</Text>
+                        <Text style={styles.userEmail}>{user.email}</Text>
+                        <View style={styles.roleChip}>
+                            <Text style={styles.roleText}>
+                                {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                             </Text>
                         </View>
                     </View>
 
-                    {/* Organizer Stats Card */}
-                    <GlassContainer className="mb-6 p-5" intensity={20}>
-                        <View className="flex-row items-center mb-4">
-                            <View className="w-10 h-10 rounded-full justify-center items-center mr-3 bg-white/10">
-                                <FontAwesome name="calendar-check-o" size={20} color="#FFFFFF" />
+                    {/* Organizer Dashboard Card */}
+                    <PremiumGlassCard style={styles.dashboardCard} intensity={Theme.blur.medium} gradient>
+                        <View style={styles.dashboardHeader}>
+                            <View style={styles.dashboardIconCircle}>
+                                <FontAwesome name="calendar-check-o" size={Theme.typography.fontSize.xl} color={Theme.colors.accent.purpleLight} />
                             </View>
-                            <Text className="text-lg font-bold text-white">Organizer Dashboard</Text>
+                            <View style={styles.dashboardTextContainer}>
+                                <Text style={styles.dashboardTitle}>Organizer Dashboard</Text>
+                                <Text style={styles.dashboardDescription}>
+                                    Manage your events and track attendance from the dashboard.
+                                </Text>
+                            </View>
                         </View>
-                        <View className="border-t border-glass-border pt-4">
-                            <Text className="text-gray-300 text-sm">
-                                Manage your events and track attendance from the dashboard.
-                            </Text>
-                        </View>
-                    </GlassContainer>
+                    </PremiumGlassCard>
 
                     {/* Logout Button */}
-                    <GlassButton
-                        title="Logout"
+                    <TouchableOpacity
                         onPress={handleLogout}
-                        variant="outline"
-                        className="mt-auto mb-6 border-red-500/50 bg-red-500/10"
-                        textClassName="text-red-400"
-                        icon={<FontAwesome name="sign-out" size={18} color="#F87171" style={{ marginRight: 8 }} />}
-                    />
+                        style={styles.logoutButton}
+                        activeOpacity={0.8}
+                    >
+                        <BlurView intensity={Theme.blur.medium} tint="dark" style={StyleSheet.absoluteFill} />
+                        <LinearGradient
+                            colors={[
+                                hexToRgba(Theme.colors.accent.red, 0.2),
+                                hexToRgba(Theme.colors.accent.red, 0.1),
+                            ]}
+                            style={StyleSheet.absoluteFill}
+                        />
+                        <FontAwesome name="sign-out" size={Theme.typography.fontSize.lg} color={Theme.colors.accent.red} style={{ marginRight: Theme.spacing.sm }} />
+                        <Text style={styles.logoutButtonText}>Logout</Text>
+                    </TouchableOpacity>
                 </View>
             </ScrollView>
         </ScreenWrapper>
     );
 }
+
+const styles = StyleSheet.create({
+    loadingContainer: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    errorText: {
+        fontSize: Theme.typography.fontSize.base,
+        color: Theme.colors.text.muted,
+    },
+    scrollView: {
+        flex: 1,
+    },
+    scrollContent: {
+        flexGrow: 1,
+        paddingBottom: 120,
+    },
+    container: {
+        paddingHorizontal: Theme.layout.padding.horizontal,
+        paddingTop: Theme.spacing.xxxl,
+    },
+    profileHeader: {
+        alignItems: 'center',
+        marginBottom: Theme.spacing.xxxl,
+    },
+    avatarContainer: {
+        width: 112,
+        height: 112,
+        borderRadius: Theme.radius.full,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: Theme.spacing.lg,
+        padding: 0,
+    },
+    avatarText: {
+        fontSize: Theme.typography.fontSize['3xl'] * 1.5,
+        fontWeight: '700',
+        color: Theme.colors.text.primary,
+    },
+    userName: {
+        fontSize: Theme.typography.fontSize['2xl'],
+        fontWeight: '700',
+        color: Theme.colors.text.primary,
+        marginBottom: Theme.spacing.xs,
+    },
+    userEmail: {
+        fontSize: Theme.typography.fontSize.base,
+        color: Theme.colors.text.secondary,
+        marginBottom: Theme.spacing.sm,
+    },
+    roleChip: {
+        paddingHorizontal: Theme.spacing.lg,
+        paddingVertical: Theme.spacing.sm,
+        borderRadius: Theme.radius.full,
+        backgroundColor: Theme.colors.glass.light,
+        borderWidth: 1,
+        borderColor: Theme.colors.glass.border,
+        marginTop: Theme.spacing.xs,
+    },
+    roleText: {
+        fontSize: Theme.typography.fontSize.sm,
+        fontWeight: '600',
+        color: Theme.colors.text.primary,
+        textTransform: 'capitalize',
+    },
+    dashboardCard: {
+        marginBottom: Theme.spacing.xxxl,
+    },
+    dashboardHeader: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+    },
+    dashboardIconCircle: {
+        width: 48,
+        height: 48,
+        borderRadius: Theme.radius.full,
+        backgroundColor: Theme.colors.glass.light,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: Theme.spacing.md,
+        borderWidth: 1,
+        borderColor: Theme.colors.glass.borderLight,
+    },
+    dashboardTextContainer: {
+        flex: 1,
+    },
+    dashboardTitle: {
+        fontSize: Theme.typography.fontSize.lg,
+        fontWeight: '700',
+        color: Theme.colors.text.primary,
+        marginBottom: Theme.spacing.xs,
+    },
+    dashboardDescription: {
+        fontSize: Theme.typography.fontSize.sm,
+        color: Theme.colors.text.tertiary,
+        lineHeight: Theme.typography.fontSize.sm * Theme.typography.lineHeight.normal,
+    },
+    logoutButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: Theme.spacing.lg,
+        paddingHorizontal: Theme.spacing.xl,
+        borderRadius: Theme.radius.full,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: hexToRgba(Theme.colors.accent.red, 0.5),
+        marginTop: 'auto',
+        marginBottom: Theme.spacing.xxxl,
+        ...Theme.shadows.sm,
+    },
+    logoutButtonText: {
+        fontSize: Theme.typography.fontSize.lg,
+        fontWeight: '700',
+        color: Theme.colors.accent.red,
+    },
+});

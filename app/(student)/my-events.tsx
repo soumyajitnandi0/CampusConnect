@@ -9,7 +9,7 @@ import { useAuth } from '../../contexts/auth.context';
 import { useEvents } from '../../contexts/events.context';
 import { Event } from '../../types/models';
 
-import { Platform, useWindowDimensions } from 'react-native';
+import { useWindowDimensions } from 'react-native';
 
 export default function MyEventsScreen() {
     const router = useRouter();
@@ -17,8 +17,7 @@ export default function MyEventsScreen() {
     const { user } = useAuth();
     const [refreshing, setRefreshing] = useState(false);
     const { width } = useWindowDimensions();
-    const isWeb = Platform.OS === 'web';
-    const numColumns = isWeb ? 3 : 1;
+    const numColumns = 1;
 
     const onRefresh = async () => {
         setRefreshing(true);
@@ -72,9 +71,8 @@ export default function MyEventsScreen() {
                 data={myEvents}
                 keyExtractor={(item) => item.id}
                 numColumns={numColumns}
-                columnWrapperStyle={isWeb ? { paddingHorizontal: 24, marginBottom: 16, maxWidth: 1152, alignSelf: 'center', width: '100%' } : undefined}
                 renderItem={({ item }) => (
-                    <View className={isWeb ? "flex-1 px-3" : "px-6"}>
+                    <View className="px-6">
                         <EventCard
                             event={item}
                             onPress={() => handleEventPress(item)}

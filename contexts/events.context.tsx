@@ -29,6 +29,14 @@ export function EventsProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [isOfflineData, setIsOfflineData] = useState(false);
 
+  // Helper to get normalized user ID (handles both id and _id)
+  const getUserId = (userObj: any): string | null => {
+    if (!userObj) return null;
+    // Try id first, then _id, then convert to string
+    const userId = userObj.id || userObj._id;
+    return userId ? userId.toString() : null;
+  };
+
   // Subscribe to real-time events updates
   useEffect(() => {
     // Wait for auth to finish loading
@@ -49,8 +57,16 @@ export function EventsProvider({ children }: { children: ReactNode }) {
         setEvents(updatedEvents);
         
         // Filter user's RSVP'd events
+        const userId = getUserId(user);
+        if (!userId) {
+          setMyEvents([]);
+          setLoading(false);
+          setError(null);
+          setIsOfflineData(false);
+          return;
+        }
         const userRSVPs = updatedEvents.filter(event => 
-          event.rsvps.includes(user.id)
+          event.rsvps.some(rsvpId => rsvpId?.toString() === userId)
         );
         setMyEvents(userRSVPs);
         
@@ -74,10 +90,13 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       const cachedEvents = await EventService.getEvents();
       setEvents(cachedEvents);
       if (user) {
-        const userRSVPs = cachedEvents.filter(event => 
-          event.rsvps.includes(user.id)
-        );
-        setMyEvents(userRSVPs);
+        const userId = getUserId(user);
+        if (userId) {
+          const userRSVPs = cachedEvents.filter(event => 
+            event.rsvps.some(rsvpId => rsvpId?.toString() === userId)
+          );
+          setMyEvents(userRSVPs);
+        }
       }
       setIsOfflineData(true);
     } catch (err: any) {
@@ -130,12 +149,66 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       }
     }
     
+    // Optimistic update - update UI immediately
+    const userId = getUserId(user);
+    if (!userId) {
+      throw new Error('User ID not found. Please log in again.');
+    }
+    let updatedEvent: Event | null = null;
+    setEvents(prevEvents => {
+      const updated = prevEvents.map(event => {
+        if (event.id === eventId) {
+          const isAlreadyRSVPd = event.rsvps.some(rsvpId => 
+            rsvpId?.toString() === userId
+          );
+          if (!isAlreadyRSVPd) {
+            updatedEvent = {
+              ...event,
+              rsvps: [...event.rsvps, userId],
+              rsvpCount: (event.rsvpCount || 0) + 1,
+            };
+            return updatedEvent;
+          }
+        }
+        return event;
+      });
+      return updated;
+    });
+    
+    // Update myEvents optimistically
+    if (updatedEvent) {
+      setMyEvents(prevMyEvents => {
+        if (!prevMyEvents.find(e => e.id === eventId)) {
+          return [...prevMyEvents, updatedEvent!];
+        }
+        return prevMyEvents;
+      });
+    }
+    
     try {
       setError(null);
-      await RSVPService.addRSVP(eventId, user.id);
-      // Refresh events to get updated RSVP count
-      await refreshEvents();
+      // Use the same userId we computed for optimistic update
+      await RSVPService.addRSVP(eventId, userId);
+      // Refresh events to get updated data from server
+      await refreshEventsSilently();
     } catch (err: any) {
+      // Rollback optimistic update on error
+      const userIdForRollback = getUserId(user);
+      if (userIdForRollback) {
+        setEvents(prevEvents => 
+          prevEvents.map(event => {
+            if (event.id === eventId) {
+              return {
+                ...event,
+                rsvps: event.rsvps.filter(id => id?.toString() !== userIdForRollback),
+                rsvpCount: Math.max(0, (event.rsvpCount || 0) - 1),
+              };
+            }
+            return event;
+          })
+        );
+      }
+      setMyEvents(prevMyEvents => prevMyEvents.filter(e => e.id !== eventId));
       setError(err.message);
       throw err;
     }
@@ -155,12 +228,71 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       }
     }
     
+    // Store the event before removing for rollback
+    const eventToRemove = events.find(e => e.id === eventId);
+    const userId = getUserId(user);
+    if (!userId) {
+      throw new Error('User ID not found. Please log in again.');
+    }
+    
+    // Optimistic update - update UI immediately
+    setEvents(prevEvents => 
+      prevEvents.map(event => {
+        if (event.id === eventId) {
+          const isRSVPd = event.rsvps.some(rsvpId => 
+            rsvpId?.toString() === userId
+          );
+          if (isRSVPd) {
+            return {
+              ...event,
+              rsvps: event.rsvps.filter(id => id?.toString() !== userId),
+              rsvpCount: Math.max(0, (event.rsvpCount || 0) - 1),
+            };
+          }
+        }
+        return event;
+      })
+    );
+    
+    // Update myEvents optimistically
+    setMyEvents(prevMyEvents => prevMyEvents.filter(e => e.id !== eventId));
+    
     try {
       setError(null);
-      await RSVPService.removeRSVP(eventId, user.id);
-      // Refresh events to get updated RSVP count
-      await refreshEvents();
+      // Use the same userId we computed for optimistic update
+      await RSVPService.removeRSVP(eventId, userId);
+      // Refresh events to get updated data from server
+      await refreshEventsSilently();
     } catch (err: any) {
+      // Rollback optimistic update on error
+      if (eventToRemove) {
+        const userIdForRollback = getUserId(user);
+        if (userIdForRollback) {
+          setEvents(prevEvents => 
+            prevEvents.map(event => {
+              if (event.id === eventId) {
+                const isCurrentlyRSVPd = event.rsvps.some(rsvpId => 
+                  rsvpId?.toString() === userIdForRollback
+                );
+                if (!isCurrentlyRSVPd) {
+                  return {
+                    ...event,
+                    rsvps: [...event.rsvps, userIdForRollback],
+                    rsvpCount: (event.rsvpCount || 0) + 1,
+                  };
+                }
+              }
+              return event;
+            })
+          );
+        }
+        setMyEvents(prevMyEvents => {
+          if (!prevMyEvents.find(e => e.id === eventId)) {
+            return [...prevMyEvents, eventToRemove];
+          }
+          return prevMyEvents;
+        });
+      }
       setError(err.message);
       throw err;
     }
@@ -169,7 +301,15 @@ export function EventsProvider({ children }: { children: ReactNode }) {
   const isUserRSVPd = (eventId: string): boolean => {
     if (!user) return false;
     const event = events.find(e => e.id === eventId);
-    return event?.rsvps.includes(user.id) || false;
+    if (!event) return false;
+    
+    // Handle both string and ObjectId comparisons
+    const userId = getUserId(user);
+    if (!userId) return false;
+    
+    return event.rsvps.some(rsvpId => 
+      rsvpId?.toString() === userId
+    );
   };
 
   const refreshEvents = async (): Promise<void> => {
@@ -180,10 +320,13 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       setEvents(updatedEvents);
       
       if (user) {
-        const userRSVPs = updatedEvents.filter(event => 
-          event.rsvps.includes(user.id)
-        );
-        setMyEvents(userRSVPs);
+        const userId = getUserId(user);
+        if (userId) {
+          const userRSVPs = updatedEvents.filter(event => 
+            event.rsvps.some(rsvpId => rsvpId?.toString() === userId)
+          );
+          setMyEvents(userRSVPs);
+        }
       }
       
       setIsOfflineData(false);
@@ -192,6 +335,30 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       setIsOfflineData(true);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Silent refresh that doesn't set loading state (for RSVP updates)
+  const refreshEventsSilently = async (): Promise<void> => {
+    try {
+      setError(null);
+      const updatedEvents = await EventService.getEvents();
+      setEvents(updatedEvents);
+      
+      if (user) {
+        const userId = getUserId(user);
+        if (userId) {
+          const userRSVPs = updatedEvents.filter(event => 
+            event.rsvps.some(rsvpId => rsvpId?.toString() === userId)
+          );
+          setMyEvents(userRSVPs);
+        }
+      }
+      
+      setIsOfflineData(false);
+    } catch (err: any) {
+      setError(err.message);
+      setIsOfflineData(true);
     }
   };
 

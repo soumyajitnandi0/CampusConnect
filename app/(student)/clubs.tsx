@@ -1,13 +1,17 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, RefreshControl, Text, TouchableOpacity, View } from 'react-native';
-import { GlassContainer } from '../../components/ui/GlassContainer';
+import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ScreenWrapper } from '../../components/ui/ScreenWrapper';
+import { Theme } from '../../constants/theme';
 import { useAuth } from '../../contexts/auth.context';
 import { ClubService } from '../../services/club.service';
 import { Club } from '../../types/models';
+import { getClubImageUrl } from '../../utils/cloudinary';
+import { hexToRgba } from '../../utils/colorUtils';
 
 export default function ClubsScreen() {
     const [clubs, setClubs] = useState<Club[]>([]);
@@ -23,14 +27,12 @@ export default function ClubsScreen() {
             const allClubs = await ClubService.getClubs();
             setClubs(allClubs);
 
-            // Fetch followed clubs to check which ones user is following
             if (user) {
                 try {
                     const followed = await ClubService.getFollowedClubs();
                     const followedIds = new Set(followed.map(c => c.id));
                     setFollowedClubIds(followedIds);
                 } catch (err) {
-                    // User might not be logged in or no followed clubs
                     console.log('No followed clubs');
                 }
             }
@@ -73,7 +75,6 @@ export default function ClubsScreen() {
                 setFollowedClubIds(prev => new Set(prev).add(clubId));
             }
 
-            // Update follower count in local state
             setClubs(prevClubs =>
                 prevClubs.map(club =>
                     club.id === clubId
@@ -103,61 +104,93 @@ export default function ClubsScreen() {
                     pathname: '/(student)/club-details',
                     params: { clubId: item.id }
                 })}
-                className="px-6 mb-4"
+                style={styles.clubCardContainer}
+                activeOpacity={0.9}
             >
-                <GlassContainer className="p-4" intensity={20}>
-                    <View className="flex-row items-center">
-                        {item.imageUrl ? (
-                            <Image
-                                source={{ uri: item.imageUrl }}
-                                style={{ width: 60, height: 60, borderRadius: 12 }}
-                                contentFit="cover"
-                            />
-                        ) : (
-                            <View className="w-15 h-15 rounded-xl bg-purple-500/20 items-center justify-center">
-                                <FontAwesome name="group" size={24} color="#A855F7" />
-                            </View>
-                        )}
-                        <View className="flex-1 ml-4">
-                            <Text className="text-white font-bold text-lg mb-1">{item.name}</Text>
-                            <Text className="text-gray-400 text-sm" numberOfLines={2}>
+                <View style={styles.clubCard}>
+                    <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                    
+                    <View style={styles.clubContent}>
+                        {/* Club Image/Icon */}
+                        <View style={styles.clubImageContainer}>
+                            {item.imageUrl ? (
+                                <Image
+                                    source={{ 
+                                        uri: (item.imageUrl.includes('cloudinary.com') || (!item.imageUrl.includes('http://') && !item.imageUrl.includes('https://')))
+                                            ? getClubImageUrl(item.imageUrl, 200)
+                                            : item.imageUrl
+                                    }}
+                                    style={styles.clubImage}
+                                    contentFit="cover"
+                                />
+                            ) : (
+                                <LinearGradient
+                                    colors={[hexToRgba(Theme.colors.accent.purple, 0.3), hexToRgba(Theme.colors.accent.purple, 0.1)]}
+                                    style={styles.clubImagePlaceholder}
+                                >
+                                    <FontAwesome name="group" size={24} color={Theme.colors.accent.purpleLight} />
+                                </LinearGradient>
+                            )}
+                        </View>
+
+                        {/* Club Info */}
+                        <View style={styles.clubInfo}>
+                            <Text style={styles.clubName} numberOfLines={1}>
+                                {item.name}
+                            </Text>
+                            <Text style={styles.clubDescription} numberOfLines={2}>
                                 {item.description}
                             </Text>
-                            <View className="flex-row items-center mt-2">
-                                <FontAwesome name="users" size={12} color="#9CA3AF" />
-                                <Text className="text-gray-500 text-xs ml-1">
-                                    {item.followerCount} {item.followerCount === 1 ? 'follower' : 'followers'}
-                                </Text>
+                            <View style={styles.clubMeta}>
+                                <View style={styles.metaItem}>
+                                    <FontAwesome name="users" size={12} color={Theme.colors.text.muted} />
+                                    <Text style={styles.metaText}>
+                                        {item.followerCount} {item.followerCount === 1 ? 'follower' : 'followers'}
+                                    </Text>
+                                </View>
                                 {item.category && (
                                     <>
-                                        <Text className="text-gray-500 text-xs mx-2">•</Text>
-                                        <Text className="text-gray-500 text-xs">{item.category}</Text>
+                                        <Text style={styles.metaSeparator}>•</Text>
+                                        <Text style={styles.metaText}>{item.category}</Text>
                                     </>
                                 )}
                             </View>
                         </View>
+
+                        {/* Follow Button */}
                         <TouchableOpacity
                             onPress={(e) => {
                                 e.stopPropagation();
                                 handleFollow(item.id);
                             }}
                             disabled={isFollowingLoading || !user}
-                            className="ml-3 px-4 py-2 rounded-xl"
-                            style={{
-                                backgroundColor: isFollowing ? '#10B981' : '#3B82F6',
-                                opacity: isFollowingLoading ? 0.7 : 1,
-                            }}
+                            style={[
+                                styles.followButton,
+                                isFollowing && styles.followButtonActive
+                            ]}
+                            activeOpacity={0.7}
                         >
+                            <BlurView 
+                                intensity={isFollowing ? 15 : 10} 
+                                tint="dark" 
+                                style={StyleSheet.absoluteFill} 
+                            />
                             {isFollowingLoading ? (
-                                <ActivityIndicator size="small" color="#FFFFFF" />
+                                <ActivityIndicator 
+                                    size="small" 
+                                    color={isFollowing ? Theme.colors.accent.green : Theme.colors.text.primary} 
+                                />
                             ) : (
-                                <Text className="text-white font-bold text-xs">
+                                <Text style={[
+                                    styles.followButtonText,
+                                    isFollowing && styles.followButtonTextActive
+                                ]}>
                                     {isFollowing ? 'Following' : 'Follow'}
                                 </Text>
                             )}
                         </TouchableOpacity>
                     </View>
-                </GlassContainer>
+                </View>
             </TouchableOpacity>
         );
     };
@@ -165,23 +198,33 @@ export default function ClubsScreen() {
     if (loading) {
         return (
             <ScreenWrapper className="justify-center items-center">
-                <ActivityIndicator size="large" color="#FFFFFF" />
+                <ActivityIndicator size="large" color={Theme.colors.text.primary} />
             </ScreenWrapper>
         );
     }
 
     return (
         <ScreenWrapper>
-            <View className="px-6 pt-4 pb-4">
-                <GlassContainer className="flex-row items-center justify-between p-6" intensity={20}>
-                    <View>
-                        <Text className="text-3xl font-bold text-white">Clubs</Text>
-                        <Text className="text-gray-300 text-sm mt-1">Discover and follow clubs</Text>
+            {/* Premium Intro Card */}
+            <View style={styles.headerContainer}>
+                <View style={styles.introCard}>
+                    <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+                    <LinearGradient
+                        colors={[hexToRgba(Theme.colors.accent.purple, 0.2), 'transparent']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={StyleSheet.absoluteFill}
+                    />
+                    <View style={styles.introContent}>
+                        <View style={styles.introIconContainer}>
+                            <FontAwesome name="group" size={28} color={Theme.colors.accent.purpleLight} />
+                        </View>
+                        <View style={styles.introTextContainer}>
+                            <Text style={styles.introTitle}>Clubs</Text>
+                            <Text style={styles.introSubtitle}>Discover and follow clubs</Text>
+                        </View>
                     </View>
-                    <View className="w-12 h-12 rounded-full bg-purple-500/20 items-center justify-center">
-                        <FontAwesome name="group" size={24} color="#A855F7" />
-                    </View>
-                </GlassContainer>
+                </View>
             </View>
 
             <FlatList
@@ -192,21 +235,178 @@ export default function ClubsScreen() {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        tintColor="#FFFFFF"
+                        tintColor={Theme.colors.text.primary}
                     />
                 }
                 ListEmptyComponent={
-                    <View className="items-center mt-20 px-6">
-                        <FontAwesome name="group" size={48} color="#4B5563" />
-                        <Text className="text-center mt-4 text-gray-400 text-base font-semibold">
-                            No clubs available
-                        </Text>
+                    <View style={styles.emptyContainer}>
+                        <FontAwesome name="group" size={56} color={Theme.colors.text.disabled} />
+                        <Text style={styles.emptyTitle}>No clubs available</Text>
+                        <Text style={styles.emptySubtitle}>Check back later for new clubs</Text>
                     </View>
                 }
-                contentContainerStyle={{ paddingBottom: 100 }}
+                contentContainerStyle={styles.listContent}
             />
         </ScreenWrapper>
     );
 }
 
-
+const styles = StyleSheet.create({
+    headerContainer: {
+        paddingHorizontal: Theme.layout.padding.horizontal,
+        paddingTop: Theme.spacing.xxl,
+        paddingBottom: Theme.spacing.lg,
+    },
+    introCard: {
+        borderRadius: Theme.radius.xl,
+        overflow: 'hidden',
+        backgroundColor: Theme.colors.glass.medium,
+        borderWidth: 1,
+        borderColor: Theme.colors.glass.border,
+        ...Theme.shadows.md,
+    },
+    introContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: Theme.layout.cardPadding.vertical,
+    },
+    introIconContainer: {
+        width: 56,
+        height: 56,
+        borderRadius: Theme.radius.md,
+        backgroundColor: Theme.colors.accent.purple + '20',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: Theme.spacing.lg,
+        borderWidth: 1,
+        borderColor: Theme.colors.accent.purple + '40',
+    },
+    introTextContainer: {
+        flex: 1,
+    },
+    introTitle: {
+        fontSize: Theme.typography.fontSize['2xl'],
+        fontWeight: '700',
+        color: Theme.colors.text.primary,
+        marginBottom: Theme.spacing.xs,
+    },
+    introSubtitle: {
+        fontSize: Theme.typography.fontSize.sm,
+        color: Theme.colors.text.muted,
+        fontWeight: '500',
+    },
+    clubCardContainer: {
+        marginHorizontal: Theme.layout.padding.horizontal,
+        marginBottom: Theme.spacing.lg,
+    },
+    clubCard: {
+        borderRadius: Theme.radius.xl,
+        overflow: 'hidden',
+        backgroundColor: Theme.colors.glass.medium,
+        borderWidth: 1,
+        borderColor: Theme.colors.glass.borderLight,
+        ...Theme.shadows.sm,
+    },
+    clubContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: Theme.layout.cardPadding.vertical,
+    },
+    clubImageContainer: {
+        width: 64,
+        height: 64,
+        borderRadius: Theme.radius.md,
+        overflow: 'hidden',
+        marginRight: Theme.spacing.lg,
+    },
+    clubImage: {
+        width: '100%',
+        height: '100%',
+    },
+    clubImagePlaceholder: {
+        width: '100%',
+        height: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    clubInfo: {
+        flex: 1,
+        marginRight: Theme.spacing.md,
+    },
+    clubName: {
+        fontSize: Theme.typography.fontSize.lg,
+        fontWeight: '700',
+        color: Theme.colors.text.primary,
+        marginBottom: Theme.spacing.xs,
+    },
+    clubDescription: {
+        fontSize: Theme.typography.fontSize.sm,
+        color: Theme.colors.text.tertiary,
+        lineHeight: Theme.typography.fontSize.sm * Theme.typography.lineHeight.normal,
+        marginBottom: Theme.spacing.sm,
+    },
+    clubMeta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Theme.spacing.xs,
+    },
+    metaItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Theme.spacing.xs,
+    },
+    metaText: {
+        fontSize: Theme.typography.fontSize.xs,
+        color: Theme.colors.text.muted,
+    },
+    metaSeparator: {
+        fontSize: Theme.typography.fontSize.xs,
+        color: Theme.colors.text.disabled,
+    },
+    followButton: {
+        paddingHorizontal: Theme.spacing.xl,
+        paddingVertical: Theme.spacing.sm,
+        borderRadius: Theme.radius.full,
+        backgroundColor: Theme.colors.glass.medium,
+        borderWidth: 1,
+        borderColor: Theme.colors.glass.border,
+        minWidth: 90,
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+    },
+    followButtonActive: {
+        backgroundColor: Theme.colors.accent.green + '20',
+        borderColor: Theme.colors.accent.green + '50',
+    },
+    followButtonText: {
+        fontSize: Theme.typography.fontSize.xs,
+        fontWeight: '700',
+        color: Theme.colors.text.primary,
+        letterSpacing: 0.5,
+    },
+    followButtonTextActive: {
+        color: Theme.colors.accent.greenLight,
+    },
+    listContent: {
+        paddingBottom: 120,
+    },
+    emptyContainer: {
+        alignItems: 'center',
+        marginTop: 80,
+        paddingHorizontal: Theme.layout.padding.horizontal,
+    },
+    emptyTitle: {
+        marginTop: Theme.spacing.xl,
+        fontSize: Theme.typography.fontSize.lg,
+        fontWeight: '600',
+        color: Theme.colors.text.secondary,
+        textAlign: 'center',
+    },
+    emptySubtitle: {
+        marginTop: Theme.spacing.sm,
+        fontSize: Theme.typography.fontSize.sm,
+        color: Theme.colors.text.muted,
+        textAlign: 'center',
+    },
+});

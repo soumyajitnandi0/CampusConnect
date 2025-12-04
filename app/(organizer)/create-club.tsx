@@ -1,23 +1,72 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { GlassContainer } from '../../components/ui/GlassContainer';
 import { GlassInput } from '../../components/ui/GlassInput';
 import { ScreenWrapper } from '../../components/ui/ScreenWrapper';
 import { ClubService } from '../../services/club.service';
+import { uploadImage } from '../../services/upload.service';
+import { getClubImageUrl } from '../../utils/cloudinary';
 import { storage } from "../../utils/storage";
 
 export default function CreateClub() {
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
-    const [imageUrl, setImageUrl] = useState('');
+    const [imagePublicId, setImagePublicId] = useState<string | null>(null);
+    const [imagePreviewUri, setImagePreviewUri] = useState<string | null>(null);
+    const [uploadingImage, setUploadingImage] = useState(false);
     const [category, setCategory] = useState('');
     const [loading, setLoading] = useState(false);
 
     const router = useRouter();
+
+    useEffect(() => {
+        requestImagePermission();
+    }, []);
+
+    const requestImagePermission = async () => {
+        if (Platform.OS !== 'web') {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Permission Required', 'We need access to your photos to upload club images.');
+            }
+        }
+    };
+
+    const handlePickImage = async () => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: 'images',
+                allowsEditing: true,
+                aspect: [1, 1], // Square aspect ratio for club images
+                quality: 0.8,
+            });
+
+            if (!result.canceled && result.assets[0]) {
+                const asset = result.assets[0];
+                setImagePreviewUri(asset.uri);
+                
+                // Upload image
+                setUploadingImage(true);
+                try {
+                    const uploadResult = await uploadImage(asset.uri, 'clubs');
+                    setImagePublicId(uploadResult.publicId);
+                    Alert.alert('Success', 'Image uploaded successfully');
+                } catch (error: any) {
+                    Alert.alert('Upload Failed', error.message || 'Failed to upload image');
+                    setImagePreviewUri(null);
+                } finally {
+                    setUploadingImage(false);
+                }
+            }
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'Failed to pick image');
+        }
+    };
 
     const handleCreate = async () => {
         if (!name || !description) {
@@ -34,7 +83,8 @@ export default function CreateClub() {
                 return;
             }
 
-            const cleanImageUrl = imageUrl && imageUrl.trim() !== '' ? imageUrl.trim() : undefined;
+            // Use Cloudinary public ID for image
+            const cleanImageUrl = imagePublicId || undefined;
 
             await ClubService.createClub({
                 name,
@@ -64,7 +114,7 @@ export default function CreateClub() {
             >
                 <ScrollView
                     className="flex-1"
-                    contentContainerStyle={{ paddingBottom: 20 }}
+                    contentContainerStyle={{ paddingBottom: 120 }}
                     keyboardShouldPersistTaps="handled"
                 >
                     {/* Header */}
@@ -92,10 +142,12 @@ export default function CreateClub() {
                     <View className="px-6 pt-6">
                         {/* Image Placeholder */}
                         <GlassContainer className="h-48 rounded-2xl mb-6 justify-center items-center border border-dashed border-white/30 p-0 relative overflow-hidden" intensity={10}>
-                            {imageUrl && imageUrl.trim() !== '' ? (
+                            {imagePreviewUri || imagePublicId ? (
                                 <>
                                     <Image
-                                        source={{ uri: imageUrl.trim() }}
+                                        source={{ 
+                                            uri: imagePreviewUri || (imagePublicId ? getClubImageUrl(imagePublicId, 400) : '')
+                                        }}
                                         style={{ width: '100%', height: '100%', borderRadius: 16 }}
                                         contentFit="cover"
                                         transition={200}
@@ -108,29 +160,71 @@ export default function CreateClub() {
                                             {name || 'Club Preview'}
                                         </Text>
                                     </LinearGradient>
+                                    {uploadingImage && (
+                                        <View className="absolute inset-0 items-center justify-center bg-black/50 rounded-2xl">
+                                            <ActivityIndicator size="large" color="#A855F7" />
+                                            <Text className="text-white mt-2 text-sm">Uploading...</Text>
+                                        </View>
+                                    )}
                                 </>
                             ) : (
-                                <LinearGradient
-                                    colors={['#3B82F6', '#9333EA']}
-                                    className="w-full h-full rounded-2xl items-center justify-center"
+                                <TouchableOpacity
+                                    onPress={handlePickImage}
+                                    disabled={uploadingImage}
+                                    activeOpacity={0.8}
+                                    className="w-full h-full"
                                 >
-                                    <FontAwesome name="image" size={40} color="#FFFFFF" />
-                                    <Text className="text-white mt-2 text-sm font-semibold">Add Club Image</Text>
-                                </LinearGradient>
+                                    <LinearGradient
+                                        colors={['#3B82F6', '#9333EA']}
+                                        className="w-full h-full rounded-2xl items-center justify-center"
+                                    >
+                                        {uploadingImage ? (
+                                            <>
+                                                <ActivityIndicator size="large" color="#FFFFFF" />
+                                                <Text className="text-white mt-2 text-sm font-semibold">Uploading...</Text>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <FontAwesome name="image" size={40} color="#FFFFFF" />
+                                                <Text className="text-white mt-2 text-sm font-semibold">Tap to Upload</Text>
+                                                <Text className="text-white/70 mt-1 text-xs">Square image recommended</Text>
+                                            </>
+                                        )}
+                                    </LinearGradient>
+                                </TouchableOpacity>
                             )}
                         </GlassContainer>
 
-                        <View className="mb-4">
-                            <GlassInput
-                                label="Image URL (Optional)"
-                                placeholder="https://example.com/image.jpg"
-                                value={imageUrl}
-                                onChangeText={setImageUrl}
-                                autoCapitalize="none"
-                                keyboardType="url"
-                                icon="link"
-                            />
-                        </View>
+                        {/* Image Actions */}
+                        {(imagePreviewUri || imagePublicId) && (
+                            <View className="mb-4 flex-row gap-2">
+                                <TouchableOpacity
+                                    onPress={handlePickImage}
+                                    disabled={uploadingImage}
+                                    className="flex-1"
+                                    activeOpacity={0.7}
+                                >
+                                    <GlassContainer className="p-3 items-center" intensity={20}>
+                                        <FontAwesome name="refresh" size={16} color="#A855F7" />
+                                        <Text className="text-gray-300 text-xs mt-1">Change Image</Text>
+                                    </GlassContainer>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setImagePublicId(null);
+                                        setImagePreviewUri(null);
+                                    }}
+                                    disabled={uploadingImage}
+                                    className="flex-1"
+                                    activeOpacity={0.7}
+                                >
+                                    <GlassContainer className="p-3 items-center" intensity={20}>
+                                        <FontAwesome name="trash" size={16} color="#EF4444" />
+                                        <Text className="text-gray-300 text-xs mt-1">Remove</Text>
+                                    </GlassContainer>
+                                </TouchableOpacity>
+                            </View>
+                        )}
 
                         {/* Club Name */}
                         <View className="mb-4">

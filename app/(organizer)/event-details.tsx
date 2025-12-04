@@ -88,6 +88,7 @@ export default function EventDetails() {
         <ScreenWrapper>
             <ScrollView
                 className="flex-1"
+                contentContainerStyle={{ paddingBottom: 120 }}
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}

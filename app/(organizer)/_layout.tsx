@@ -3,10 +3,12 @@ import { Tabs } from 'expo-router';
 import React from 'react';
 import { Platform } from 'react-native';
 import GlassTabBarBackground from '../../components/ui/GlassTabBarBackground';
+import { Theme } from '../../constants/theme';
 
 function TabBarIcon(props: {
     name: React.ComponentProps<typeof FontAwesome>['name'];
     color: string;
+    focused?: boolean;
 }) {
     return <FontAwesome size={24} style={{ marginBottom: -3 }} {...props} />;
 }
@@ -15,31 +17,26 @@ export default function OrganizerLayout() {
     return (
         <Tabs
             screenOptions={{
-                tabBarActiveTintColor: '#FFFFFF',
-                tabBarInactiveTintColor: '#9CA3AF',
+                tabBarActiveTintColor: Theme.colors.text.primary,
+                tabBarInactiveTintColor: Theme.colors.text.muted,
                 headerShown: false,
                 tabBarBackground: () => <GlassTabBarBackground />,
-                tabBarStyle: Platform.select({
-                    ios: {
-                        position: 'absolute',
-                        backgroundColor: 'transparent',
-                        borderTopWidth: 0,
-                        elevation: 0,
-                        height: 85,
-                    },
-                    default: {
-                        position: 'absolute',
-                        backgroundColor: 'transparent',
-                        borderTopWidth: 0,
-                        elevation: 0,
-                        height: 65,
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                    },
-                }),
+                tabBarStyle: {
+                    position: 'absolute',
+                    backgroundColor: 'transparent',
+                    borderTopWidth: 0,
+                    elevation: 0,
+                    height: Platform.OS === 'ios' ? 85 : 65,
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                },
                 tabBarItemStyle: {
-                    paddingTop: 8,
+                    paddingTop: Platform.OS === 'ios' ? 8 : 4,
+                },
+                tabBarLabelStyle: {
+                    fontSize: Theme.typography.fontSize.xs,
+                    fontWeight: '600',
                 },
             }}>
             <Tabs.Screen
@@ -60,7 +57,13 @@ export default function OrganizerLayout() {
                 name="create-event"
                 options={{
                     title: 'Create',
-                    tabBarIcon: ({ color }) => <TabBarIcon name="plus-square" color={color} />,
+                    tabBarIcon: ({ color, focused }) => (
+                        <TabBarIcon 
+                            name="plus-circle" 
+                            color={focused ? Theme.colors.accent.purpleLight : color} 
+                            focused={focused}
+                        />
+                    ),
                 }}
             />
             <Tabs.Screen
