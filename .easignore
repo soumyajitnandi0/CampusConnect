@@ -1,0 +1,16 @@
+# Exclude native directories to use managed workflow
+android/
+ios/
+
+# Exclude build artifacts
+dist/
+web-build/
+*.apk
+*.aab
+*.ipa
+
+# Exclude local development files
+local.properties
+.env
+.env.local
+

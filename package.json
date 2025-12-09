@@ -10,6 +10,9 @@
     "web": "expo start --web",
     "build:web": "node scripts/inject-env.js && npx expo export --platform web --output-dir web-build",
     "serve:web": "npx serve web-build --single --listen 3000",
+    "build:android": "npx eas build --platform android --profile production",
+    "build:android:preview": "npx eas build --platform android --profile preview",
+    "prebuild:android": "npx expo prebuild --platform android",
     "lint": "expo lint"
   },
   "dependencies": {
@@ -44,7 +47,6 @@
     "expo-web-browser": "~15.0.9",
     "firebase": "^12.6.0",
     "nativewind": "^4.2.1",
-    "nodemailer": "^7.0.11",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
@@ -60,10 +62,11 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
+    "eas-cli": "^16.28.0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
-    "typescript": "~5.9.2",
-    "serve": "^14.2.1"
+    "serve": "^14.2.1",
+    "typescript": "~5.9.2"
   },
   "private": true
 }
