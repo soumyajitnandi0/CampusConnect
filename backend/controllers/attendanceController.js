@@ -225,3 +225,91 @@ exports.getAttendanceStats = async (req, res) => {
         res.status(500).json({ msg: 'Server Error' });
     }
 };
+
+// Get user attendance records (all checked-in events)
+exports.getUserAttendance = async (req, res) => {
+    try {
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ msg: 'Authentication required' });
+        }
+
+        const userId = req.user.id;
+        const limit = parseInt(req.query.limit) || 50;
+        const skip = parseInt(req.query.skip) || 0;
+
+        console.log('Fetching attendance for user:', userId, typeof userId);
+
+        // Convert userId to ObjectId to ensure proper matching
+        const mongoose = require('mongoose');
+        let queryUserId = userId;
+        
+        // Try to convert to ObjectId if it's a valid ObjectId string
+        if (mongoose.Types.ObjectId.isValid(userId)) {
+            queryUserId = new mongoose.Types.ObjectId(userId);
+        }
+
+        // Get ALL check-ins for the user (all events where user has already checked in)
+        const checkIns = await CheckIn.find({ user: queryUserId })
+            .populate({
+                path: 'event',
+                populate: [
+                    {
+                        path: 'organizer',
+                        select: 'name email'
+                    },
+                    {
+                        path: 'club',
+                        select: 'name'
+                    }
+                ]
+            })
+            .sort({ checkInTime: -1 }) // Most recent first
+            .limit(limit)
+            .skip(skip);
+
+        console.log(`Found ${checkIns.length} check-ins for user ${userId}`);
+
+        // Transform the data to include event information - only show events that are already checked in
+        const attendanceRecords = checkIns
+            .filter(checkIn => {
+                // Only include check-ins where event exists (not deleted)
+                if (!checkIn.event) {
+                    console.warn(`Check-in ${checkIn._id} has no event associated`);
+                    return false;
+                }
+                return true;
+            })
+            .map(checkIn => ({
+                id: checkIn._id.toString(),
+                checkInTime: checkIn.checkInTime,
+                event: {
+                    id: checkIn.event._id.toString(),
+                    title: checkIn.event.title,
+                    description: checkIn.event.description,
+                    date: checkIn.event.date,
+                    location: checkIn.event.location,
+                    organizer: checkIn.event.organizer?.name || 'Unknown',
+                    clubName: checkIn.event.club?.name,
+                    category: checkIn.event.category,
+                    imageUrl: checkIn.event.imageUrl,
+                }
+            }));
+
+        // Get total count of all checked-in events for this user
+        const totalCount = await CheckIn.countDocuments({ user: queryUserId });
+        
+        console.log(`Total checked-in events: ${totalCount}, returning ${attendanceRecords.length} records`);
+
+        res.json({
+            records: attendanceRecords,
+            total: totalCount,
+            limit,
+            skip,
+        });
+    } catch (err) {
+        console.error('Get User Attendance Error:', err);
+        console.error('Error stack:', err.stack);
+        console.error('User ID:', req.user?.id);
+        res.status(500).json({ msg: err.message || 'Server Error' });
+    }
+};

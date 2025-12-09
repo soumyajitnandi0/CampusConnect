@@ -53,13 +53,11 @@ export default function ProfileScreen() {
                 return;
             }
 
-            const response = await api.get(`/rsvps/user/${userId}`, {
-                headers: {
-                    'x-auth-token': token,
-                },
-            });
+            // API client automatically adds token via interceptor
+            const response = await api.get(`/rsvps/user/${userId}`);
 
-            const rsvpsData = response.data;
+            // API client extracts data, so response is already the array
+            const rsvpsData = Array.isArray(response) ? response : [];
             
             const upcomingEvents = rsvpsData
                 .filter((rsvp: any) => rsvp.status === 'going' && rsvp.event)

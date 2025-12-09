@@ -212,16 +212,37 @@ exports.syncUser = async (req, res) => {
             console.log(`New ${req.body.role} account created for: ${email}`);
         }
 
-        res.json({ 
-            user: { 
-                id: user.id, 
-                name: user.name, 
-                email: user.email, 
-                role: user.role, 
-                rollNo: user.rollNo, 
-                yearSection: user.yearSection 
-            } 
-        });
+        // Generate JWT token for subsequent API calls
+        const payload = {
+            user: {
+                id: user.id,
+                email: user.email,
+                role: user.role,
+            },
+        };
+
+        jwt.sign(
+            payload,
+            process.env.JWT_SECRET || process.env.SUPABASE_JWT_SECRET || 'fallback_secret',
+            { expiresIn: '5d' },
+            (err, token) => {
+                if (err) {
+                    console.error('Error generating JWT in sync:', err);
+                    return res.status(500).json({ msg: 'Error generating token' });
+                }
+                res.json({ 
+                    token, // Return JWT token for subsequent API calls
+                    user: { 
+                        id: user.id, 
+                        name: user.name, 
+                        email: user.email, 
+                        role: user.role, 
+                        rollNo: user.rollNo, 
+                        yearSection: user.yearSection 
+                    } 
+                });
+            }
+        );
     } catch (err) {
         console.error('Sync User Error:', err);
         console.error('Token payload:', req.user);

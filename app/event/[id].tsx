@@ -87,7 +87,13 @@ export default function EventDetailsScreen() {
             await refreshEvents();
         } catch (error: any) {
             console.error('RSVP error:', error);
-            const errorMessage = error.response?.data?.msg || error.message || 'Failed to update RSVP';
+            let errorMessage = error.message || 'Failed to update RSVP';
+            
+            // If authentication error, suggest logging out and back in
+            if (errorMessage.includes('Authentication') || errorMessage.includes('Token')) {
+                errorMessage = 'Your session has expired. Please log out and log back in, then try again.';
+            }
+            
             Alert.alert('Error', errorMessage);
         } finally {
             setRsvping(false);

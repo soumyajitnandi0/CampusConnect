@@ -6,7 +6,6 @@ import { GlassButton } from '../../components/ui/GlassButton';
 import { GlassContainer } from '../../components/ui/GlassContainer';
 import { ScreenWrapper } from '../../components/ui/ScreenWrapper';
 import api from '../../services/api';
-import { storage } from '../../utils/storage';
 
 export default function EventDetails() {
     const { id } = useLocalSearchParams();
@@ -19,11 +18,10 @@ export default function EventDetails() {
     const fetchDetails = async () => {
         try {
             setRefreshing(true);
-            const token = await storage.getItem('token');
-            const res = await api.get(`/dashboard/event/${id}`, {
-                headers: { 'x-auth-token': token }
-            });
-            setData(res.data);
+            // API client automatically adds token via interceptor
+            const res = await api.get(`/dashboard/event/${id}`);
+            // API client extracts data, so res is already the data object
+            setData(res);
         } catch (err) {
             console.error(err);
         } finally {
@@ -51,16 +49,12 @@ export default function EventDetails() {
                     onPress: async () => {
                         try {
                             setActionLoading(true);
-                            const token = await storage.getItem('token');
-                            
-                            await api.post(`/events/${id}/cancel`, 
-                                {},
-                                { headers: { 'x-auth-token': token } }
-                            );
+                            // API client automatically adds token via interceptor
+                            await api.post(`/events/${id}/cancel`, {});
                             Alert.alert('Success', 'Event has been canceled');
                             fetchDetails(); // Refresh data
                         } catch (err: any) {
-                            Alert.alert('Error', err.response?.data?.msg || 'Failed to cancel event');
+                            Alert.alert('Error', err.message || 'Failed to cancel event');
                         } finally {
                             setActionLoading(false);
                         }

@@ -32,10 +32,13 @@ if (typeof ErrorUtils !== 'undefined') {
       errorMessage.includes('java.io.IOException') ||
       errorMessage.includes('remote update') ||
       errorMessage.includes('IOException') ||
-      (errorMessage.includes('download') && errorMessage.includes('update'))
+      (errorMessage.includes('download') && errorMessage.includes('update')) ||
+      // Suppress NativeWind dark mode error on web
+      errorMessage.includes('Cannot manually set color scheme') ||
+      errorMessage.includes('dark mode is type')
     ) {
       // Silently suppress - don't crash the app
-      console.warn('[Suppressed] Expo Updates error:', errorMessage);
+      console.warn('[Suppressed]', errorMessage);
       return;
     }
     // Handle other errors normally
@@ -43,6 +46,22 @@ if (typeof ErrorUtils !== 'undefined') {
       originalHandler(error, isFatal);
     }
   });
+}
+
+// Suppress NativeWind dark mode error on web
+if (typeof window !== 'undefined') {
+  const originalConsoleError = console.error;
+  console.error = (...args: any[]) => {
+    const errorMessage = args.join(' ');
+    if (
+      errorMessage.includes('Cannot manually set color scheme') ||
+      errorMessage.includes('dark mode is type')
+    ) {
+      // Suppress NativeWind dark mode warning on web
+      return;
+    }
+    originalConsoleError.apply(console, args);
+  };
 }
 
 export default function RootLayout() {

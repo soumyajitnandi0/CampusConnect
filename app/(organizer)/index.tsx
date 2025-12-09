@@ -1,6 +1,6 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { EventCard } from '../../components/event-card';
 import { OrganizerFloatingButton } from '../../components/ui/OrganizerFloatingButton';
@@ -45,6 +45,15 @@ export default function OrganizerDashboard() {
         }
         // If user is undefined, it's still loading, keep loading state
     }, [user]);
+
+    // Refresh events when screen comes into focus (e.g., after creating an event)
+    useFocusEffect(
+        useCallback(() => {
+            if (user && user.id) {
+                fetchEvents();
+            }
+        }, [user])
+    );
 
     const onRefresh = () => {
         setRefreshing(true);

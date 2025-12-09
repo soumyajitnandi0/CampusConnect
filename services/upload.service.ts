@@ -1,6 +1,5 @@
 import { Platform } from 'react-native';
-import { storage } from '../utils/storage';
-import api from './api';
+import apiClient from '../src/infrastructure/api/client';
 
 export interface UploadResponse {
   publicId: string;
@@ -17,11 +16,6 @@ export interface UploadResponse {
  */
 export async function uploadImage(imageUri: string, type: 'events' | 'clubs' = 'events'): Promise<UploadResponse> {
   try {
-    const token = await storage.getItem('token');
-    if (!token) {
-      throw new Error('Authentication required');
-    }
-
     // Create FormData for React Native
     const formData = new FormData();
     
@@ -50,47 +44,13 @@ export async function uploadImage(imageUri: string, type: 'events' | 'clubs' = '
       name: `event-image.${fileExtension}`,
     } as any);
 
-    // Upload to backend with type parameter
-    const uploadResponse = await fetch(`${api.defaults.baseURL}/upload/image?type=${type}`, {
-      method: 'POST',
-      headers: {
-        'x-auth-token': token,
-        // Don't set Content-Type, let fetch set it with boundary for FormData
-      },
-      body: formData as any,
-    });
+    // Use API client's upload method which handles authentication via interceptor
+    const response = await apiClient.upload<UploadResponse>(
+      `/upload/image?type=${type}`,
+      formData
+    );
 
-    if (!uploadResponse.ok) {
-      // Try to parse as JSON, but handle HTML/plain text errors
-      let errorMessage = 'Failed to upload image';
-      try {
-        const contentType = uploadResponse.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-          const error = await uploadResponse.json();
-          errorMessage = error.msg || error.message || errorMessage;
-        } else {
-          // If not JSON, read as text
-          const text = await uploadResponse.text();
-          console.error('Upload error response (non-JSON):', text);
-          errorMessage = `Upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`;
-        }
-      } catch (parseError) {
-        console.error('Error parsing upload response:', parseError);
-        errorMessage = `Upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`;
-      }
-      throw new Error(errorMessage);
-    }
-
-    // Parse successful response
-    const contentType = uploadResponse.headers.get('content-type');
-    if (contentType && contentType.includes('application/json')) {
-      return await uploadResponse.json();
-    } else {
-      // If response is not JSON, something went wrong
-      const text = await uploadResponse.text();
-      console.error('Unexpected upload response format:', text);
-      throw new Error('Invalid response from server');
-    }
+    return response;
   } catch (error: any) {
     console.error('Upload error:', error);
     throw new Error(error.message || 'Failed to upload image');

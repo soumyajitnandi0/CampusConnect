@@ -1,5 +1,4 @@
 import { Club } from '../types/models';
-import { storage } from '../utils/storage';
 import api from './api';
 
 export class ClubService {
@@ -13,16 +12,12 @@ export class ClubService {
     category?: string;
   }): Promise<Club> {
     try {
-      const token = await storage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication required');
-      }
-      const response = await api.post('/clubs', data, {
-        headers: { 'x-auth-token': token },
-      });
-      return this.transformClub(response.data);
+      // API client automatically adds token via interceptor
+      const response = await api.post('/clubs', data);
+      // API client extracts data, so response is already the club object
+      return this.transformClub(response);
     } catch (error: any) {
-      throw new Error(error.response?.data?.msg || 'Failed to create club');
+      throw new Error(error.message || 'Failed to create club');
     }
   }
 
@@ -31,10 +26,14 @@ export class ClubService {
    */
   static async getClubs(): Promise<Club[]> {
     try {
+      // API client automatically adds token via interceptor
       const response = await api.get('/clubs');
-      return response.data.map((club: any) => this.transformClub(club));
+      // API client extracts data, so response is already the array
+      return Array.isArray(response)
+        ? response.map((club: any) => this.transformClub(club))
+        : [];
     } catch (error: any) {
-      throw new Error(error.response?.data?.msg || 'Failed to fetch clubs');
+      throw new Error(error.message || 'Failed to fetch clubs');
     }
   }
 
@@ -43,10 +42,12 @@ export class ClubService {
    */
   static async getClubById(id: string): Promise<Club> {
     try {
+      // API client automatically adds token via interceptor
       const response = await api.get(`/clubs/${id}`);
-      return this.transformClub(response.data);
+      // API client extracts data, so response is already the club object
+      return this.transformClub(response);
     } catch (error: any) {
-      throw new Error(error.response?.data?.msg || 'Failed to fetch club');
+      throw new Error(error.message || 'Failed to fetch club');
     }
   }
 
@@ -55,16 +56,15 @@ export class ClubService {
    */
   static async getMyClubs(): Promise<Club[]> {
     try {
-      const token = await storage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication required');
-      }
-      const response = await api.get('/clubs/organizer/my-clubs', {
-        headers: { 'x-auth-token': token },
-      });
-      return response.data.map((club: any) => this.transformClub(club));
+      // API client automatically adds token via interceptor
+      const response = await api.get('/clubs/organizer/my-clubs');
+      // API client extracts data, so response is already the array
+      return Array.isArray(response)
+        ? response.map((club: any) => this.transformClub(club))
+        : [];
     } catch (error: any) {
-      throw new Error(error.response?.data?.msg || 'Failed to fetch my clubs');
+      console.error('Error in getMyClubs:', error);
+      throw new Error(error.message || 'Failed to fetch my clubs');
     }
   }
 
@@ -73,16 +73,14 @@ export class ClubService {
    */
   static async getFollowedClubs(): Promise<Club[]> {
     try {
-      const token = await storage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication required');
-      }
-      const response = await api.get('/clubs/user/followed', {
-        headers: { 'x-auth-token': token },
-      });
-      return response.data.map((club: any) => this.transformClub(club));
+      // API client automatically adds token via interceptor
+      const response = await api.get('/clubs/user/followed');
+      // API client extracts data, so response is already the array
+      return Array.isArray(response)
+        ? response.map((club: any) => this.transformClub(club))
+        : [];
     } catch (error: any) {
-      throw new Error(error.response?.data?.msg || 'Failed to fetch followed clubs');
+      throw new Error(error.message || 'Failed to fetch followed clubs');
     }
   }
 
@@ -91,15 +89,10 @@ export class ClubService {
    */
   static async followClub(clubId: string): Promise<void> {
     try {
-      const token = await storage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication required');
-      }
-      await api.post(`/clubs/${clubId}/follow`, {}, {
-        headers: { 'x-auth-token': token },
-      });
+      // API client automatically adds token via interceptor
+      await api.post(`/clubs/${clubId}/follow`, {});
     } catch (error: any) {
-      throw new Error(error.response?.data?.msg || 'Failed to follow club');
+      throw new Error(error.message || 'Failed to follow club');
     }
   }
 
@@ -108,15 +101,10 @@ export class ClubService {
    */
   static async unfollowClub(clubId: string): Promise<void> {
     try {
-      const token = await storage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication required');
-      }
-      await api.delete(`/clubs/${clubId}/follow`, {
-        headers: { 'x-auth-token': token },
-      });
+      // API client automatically adds token via interceptor
+      await api.delete(`/clubs/${clubId}/follow`);
     } catch (error: any) {
-      throw new Error(error.response?.data?.msg || 'Failed to unfollow club');
+      throw new Error(error.message || 'Failed to unfollow club');
     }
   }
 
@@ -125,10 +113,12 @@ export class ClubService {
    */
   static async getClubEvents(clubId: string): Promise<any[]> {
     try {
+      // API client automatically adds token via interceptor
       const response = await api.get(`/clubs/${clubId}/events`);
-      return response.data;
+      // API client extracts data, so response is already the array
+      return Array.isArray(response) ? response : [];
     } catch (error: any) {
-      throw new Error(error.response?.data?.msg || 'Failed to fetch club events');
+      throw new Error(error.message || 'Failed to fetch club events');
     }
   }
 
@@ -142,16 +132,12 @@ export class ClubService {
     category?: string;
   }): Promise<Club> {
     try {
-      const token = await storage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication required');
-      }
-      const response = await api.put(`/clubs/${clubId}`, data, {
-        headers: { 'x-auth-token': token },
-      });
-      return this.transformClub(response.data);
+      // API client automatically adds token via interceptor
+      const response = await api.put(`/clubs/${clubId}`, data);
+      // API client extracts data, so response is already the club object
+      return this.transformClub(response);
     } catch (error: any) {
-      throw new Error(error.response?.data?.msg || 'Failed to update club');
+      throw new Error(error.message || 'Failed to update club');
     }
   }
 
@@ -160,15 +146,10 @@ export class ClubService {
    */
   static async deleteClub(clubId: string): Promise<void> {
     try {
-      const token = await storage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication required');
-      }
-      await api.delete(`/clubs/${clubId}`, {
-        headers: { 'x-auth-token': token },
-      });
+      // API client automatically adds token via interceptor
+      await api.delete(`/clubs/${clubId}`);
     } catch (error: any) {
-      throw new Error(error.response?.data?.msg || 'Failed to delete club');
+      throw new Error(error.message || 'Failed to delete club');
     }
   }
 

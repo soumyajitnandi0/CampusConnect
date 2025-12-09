@@ -1,16 +1,11 @@
-import axios from 'axios';
-import { Platform } from 'react-native';
+/**
+ * Legacy API client - maintained for backward compatibility
+ * New code should use src/infrastructure/api/client.ts
+ */
+import apiClient from '../src/infrastructure/api/client';
 
-// Use localhost for web, local IP for mobile devices
-const BASE_URL = Platform.OS === 'web' 
-    ? 'http://localhost:5000/api'
-    : 'http://10.20.21.152:5000/api';
+// Export the new API client as default for backward compatibility
+export default apiClient;
 
-const api = axios.create({
-    baseURL: BASE_URL,
-    headers: {
-        'Content-Type': 'application/json',
-    },
-});
-
-export default api;
+// Re-export for convenience
+export { apiClient };

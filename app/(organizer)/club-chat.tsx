@@ -195,17 +195,28 @@ export default function ClubChatScreen() {
 
                 {/* Message Input Bar */}
                 <View style={[styles.inputContainer, { paddingBottom: bottomPadding }]}>
-                    <BlurView intensity={Theme.blur.medium} tint="dark" style={StyleSheet.absoluteFill} />
+                    <BlurView 
+                        intensity={Theme.blur.medium} 
+                        tint="dark" 
+                        style={StyleSheet.absoluteFill}
+                        pointerEvents="none"
+                    />
                     <LinearGradient
                         colors={[
                             hexToRgba(Theme.colors.background.primary, 0.95),
                             hexToRgba(Theme.colors.background.secondary, 0.95),
                         ]}
                         style={StyleSheet.absoluteFill}
+                        pointerEvents="none"
                     />
                     <View style={styles.inputBar}>
                         <View style={styles.inputWrapper}>
-                            <BlurView intensity={Theme.blur.light} tint="dark" style={StyleSheet.absoluteFill} />
+                            <BlurView 
+                                intensity={Theme.blur.light} 
+                                tint="dark" 
+                                style={StyleSheet.absoluteFill}
+                                pointerEvents="none"
+                            />
                             <TextInput
                                 style={styles.textInput}
                                 placeholder="Type a message..."
@@ -215,6 +226,7 @@ export default function ClubChatScreen() {
                                 multiline
                                 maxLength={500}
                                 textAlignVertical="center"
+                                editable={true}
                             />
                         </View>
                         <Animated.View style={{ transform: [{ scale: sendButtonScale }] }}>
@@ -330,12 +342,14 @@ const styles = StyleSheet.create({
         maxHeight: 100,
         paddingHorizontal: Theme.spacing.lg,
         justifyContent: 'center',
+        position: 'relative',
     },
     textInput: {
         fontSize: Theme.typography.fontSize.base,
         color: Theme.colors.text.primary,
         fontWeight: '500',
         paddingVertical: Theme.spacing.md,
+        zIndex: 10,
     },
     sendButton: {
         width: 48,

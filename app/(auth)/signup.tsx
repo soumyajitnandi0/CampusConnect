@@ -59,7 +59,8 @@ export default function Signup() {
                 ...(role === 'student' && { rollNo, yearSection }),
             });
 
-            const { token, user } = response.data;
+            // API client extracts data, so response is already the data object
+            const { token, user } = response;
 
             await storage.setItem('token', token);
             await storage.setItem('user', JSON.stringify(user));

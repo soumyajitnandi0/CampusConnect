@@ -67,17 +67,10 @@ export class NotificationService {
    */
   static async storePushToken(token: string): Promise<void> {
     try {
-      const authToken = await storage.getItem('token');
-      if (!authToken) {
-        return; // User not logged in
-      }
-
+      // API client automatically adds token via interceptor
       await api.post(
         '/users/push-token',
-        { pushToken: token },
-        {
-          headers: { 'x-auth-token': authToken },
-        }
+        { pushToken: token }
       );
 
       await storage.setItem('pushToken', token);
@@ -91,20 +84,13 @@ export class NotificationService {
    */
   static async sendToEvent(eventId: string, notification: NotificationData): Promise<void> {
     try {
-      const token = await storage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication required');
-      }
-
+      // API client automatically adds token via interceptor
       await api.post(
         `/notifications/event/${eventId}`,
-        notification,
-        {
-          headers: { 'x-auth-token': token },
-        }
+        notification
       );
     } catch (error: any) {
-      throw new Error(error.response?.data?.msg || 'Failed to send notification');
+      throw new Error(error.message || 'Failed to send notification');
     }
   }
 
@@ -113,20 +99,13 @@ export class NotificationService {
    */
   static async sendToUser(userId: string, notification: NotificationData): Promise<void> {
     try {
-      const token = await storage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication required');
-      }
-
+      // API client automatically adds token via interceptor
       await api.post(
         `/notifications/user/${userId}`,
-        notification,
-        {
-          headers: { 'x-auth-token': token },
-        }
+        notification
       );
     } catch (error: any) {
-      throw new Error(error.response?.data?.msg || 'Failed to send notification');
+      throw new Error(error.message || 'Failed to send notification');
     }
   }
 

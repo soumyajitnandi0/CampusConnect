@@ -38,17 +38,29 @@ export default function Login() {
 
                 // Check if user exists and has a role
                 try {
+                    // Temporarily store the Supabase token so the interceptor can use it
+                    await storage.setItem('token', session.access_token);
+                    
                     // First, try to sync without role to check if user exists
                     // If user exists with a role, we'll get the user back
                     // If user doesn't exist or has no role, we'll get a 400 error
-                    const res = await api.post('/auth/sync', {}, {
-                        headers: { 'x-auth-token': session.access_token }
-                    });
+                    const res = await api.post('/auth/sync', {});
 
-                    const user = res.data.user;
+                    // API client extracts data, so res is already the data object
+                    const { token: jwtToken, user } = res;
 
                     // If user exists and has a role, proceed to dashboard
                     if (user && user.role) {
+                        // Store the JWT token returned from sync (replaces Supabase token)
+                        if (jwtToken) {
+                            await storage.setItem('token', jwtToken);
+                            console.log('[Login] JWT token stored after sync, length:', jwtToken.length);
+                            // Verify token was stored
+                            const storedToken = await storage.getItem('token');
+                            console.log('[Login] Verified stored token matches:', storedToken === jwtToken);
+                        } else {
+                            console.warn('[Login] No JWT token returned from sync!');
+                        }
                         await storage.setItem('user', JSON.stringify(user));
                         await sessionManager.saveLoginTimestamp(); // Update session timestamp
 
@@ -109,14 +121,19 @@ export default function Login() {
                         if (!freshError && freshSession) {
                             // Retry with fresh token
                             try {
-                                const retryRes = await api.post('/auth/sync', {}, {
-                                    headers: { 'x-auth-token': freshSession.access_token }
-                                });
+                                // Temporarily store the fresh Supabase token
+                                await storage.setItem('token', freshSession.access_token);
+                                
+                                const retryRes = await api.post('/auth/sync', {});
 
-                                const retryUser = retryRes.data.user;
+                                // API client extracts data, so retryRes is already the data object
+                                const { token: retryJwtToken, user: retryUser } = retryRes;
 
                                 if (retryUser && retryUser.role) {
-                                    await storage.setItem('token', freshSession.access_token);
+                                    // Store the JWT token returned from sync (replaces Supabase token)
+                                    if (retryJwtToken) {
+                                        await storage.setItem('token', retryJwtToken);
+                                    }
                                     await storage.setItem('user', JSON.stringify(retryUser));
                                     await sessionManager.saveLoginTimestamp();
                                     await refreshAuthState(); // Refresh auth state

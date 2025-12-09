@@ -7,7 +7,6 @@ import { GlassContainer } from '../../components/ui/GlassContainer';
 import { GlassInput } from '../../components/ui/GlassInput';
 import { ScreenWrapper } from '../../components/ui/ScreenWrapper';
 import api from '../../services/api';
-import { storage } from "../../utils/storage";
 
 export default function FeedbackScreen() {
     const { eventId, eventTitle } = useLocalSearchParams();
@@ -20,13 +19,11 @@ export default function FeedbackScreen() {
         if (submitting) return;
         setSubmitting(true);
         try {
-            const token = await storage.getItem('token');
+            // API client automatically adds token via interceptor
             await api.post('/feedback', {
                 eventId,
                 rating,
                 comment
-            }, {
-                headers: { 'x-auth-token': token }
             });
 
             Alert.alert('Success', 'Thank you for your feedback!');

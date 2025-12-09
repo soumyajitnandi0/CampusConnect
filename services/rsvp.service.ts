@@ -1,5 +1,4 @@
 import { RSVP } from '../types/models';
-import { storage } from '../utils/storage';
 import api from './api';
 
 export class RSVPService {
@@ -8,22 +7,49 @@ export class RSVPService {
    */
   static async addRSVP(eventId: string, userId: string): Promise<RSVP> {
     try {
+      // Debug: Check token before making request
+      const { storage } = await import('../utils/storage');
       const token = await storage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication required');
+      if (token) {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          try {
+            const base64Url = parts[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const payload = JSON.parse(atob(base64));
+            console.log('[RSVP] Token type:', payload.user?.id ? 'JWT' : payload.email ? 'Supabase' : 'Unknown');
+            console.log('[RSVP] Token has user.id:', !!payload.user?.id);
+          } catch (e) {
+            console.warn('[RSVP] Could not decode token payload');
+          }
+        } else {
+          console.error('[RSVP] Invalid token format - not a JWT (should have 3 parts)');
+        }
+      } else {
+        console.error('[RSVP] No token found in storage!');
       }
 
+      // API client automatically adds token via interceptor
       const response = await api.post(
         `/events/${eventId}/rsvp`,
-        { status: 'going' },
-        {
-          headers: { 'x-auth-token': token },
-        }
+        { status: 'going' }
       );
 
-      return this.transformRSVP(response.data);
+      // API client extracts data, so response is already the RSVP object
+      return this.transformRSVP(response);
     } catch (error: any) {
-      throw new Error(error.response?.data?.msg || 'Failed to RSVP');
+      console.error('[RSVP] Error details:', {
+        message: error.message,
+        statusCode: error.statusCode,
+        url: `/events/${eventId}/rsvp`
+      });
+      
+      // If it's an authentication error, provide helpful message
+      if (error.message?.includes('Token') || error.message?.includes('401') || error.statusCode === 401) {
+        throw new Error('Authentication failed. Please log out and log back in to refresh your session.');
+      }
+      
+      throw new Error(error.message || 'Failed to RSVP');
     }
   }
 
@@ -32,16 +58,10 @@ export class RSVPService {
    */
   static async removeRSVP(eventId: string, userId: string): Promise<void> {
     try {
-      const token = await storage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication required');
-      }
-
-      await api.delete(`/events/${eventId}/rsvp`, {
-        headers: { 'x-auth-token': token },
-      });
+      // API client automatically adds token via interceptor
+      await api.delete(`/events/${eventId}/rsvp`);
     } catch (error: any) {
-      throw new Error(error.response?.data?.msg || 'Failed to cancel RSVP');
+      throw new Error(error.message || 'Failed to cancel RSVP');
     }
   }
 
@@ -50,13 +70,14 @@ export class RSVPService {
    */
   static async getUserRSVPs(userId: string): Promise<RSVP[]> {
     try {
-      const token = await storage.getItem('token');
-      const response = await api.get(`/rsvps/user/${userId}`, {
-        headers: token ? { 'x-auth-token': token } : {},
-      });
-      return response.data.map((rsvp: any) => this.transformRSVP(rsvp));
+      // API client automatically adds token via interceptor
+      const response = await api.get(`/rsvps/user/${userId}`);
+      // API client extracts data, so response is already the array
+      return Array.isArray(response)
+        ? response.map((rsvp: any) => this.transformRSVP(rsvp))
+        : [];
     } catch (error: any) {
-      throw new Error(error.response?.data?.msg || 'Failed to fetch RSVPs');
+      throw new Error(error.message || 'Failed to fetch RSVPs');
     }
   }
 
@@ -65,13 +86,14 @@ export class RSVPService {
    */
   static async getEventRSVPs(eventId: string): Promise<RSVP[]> {
     try {
-      const token = await storage.getItem('token');
-      const response = await api.get(`/rsvps/event/${eventId}`, {
-        headers: token ? { 'x-auth-token': token } : {},
-      });
-      return response.data.map((rsvp: any) => this.transformRSVP(rsvp));
+      // API client automatically adds token via interceptor
+      const response = await api.get(`/rsvps/event/${eventId}`);
+      // API client extracts data, so response is already the array
+      return Array.isArray(response)
+        ? response.map((rsvp: any) => this.transformRSVP(rsvp))
+        : [];
     } catch (error: any) {
-      throw new Error(error.response?.data?.msg || 'Failed to fetch RSVPs');
+      throw new Error(error.message || 'Failed to fetch RSVPs');
     }
   }
 

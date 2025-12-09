@@ -7,3 +7,17 @@
         @apply bg-black text-white;
     }
 }
+
+/* Fix NativeWind dark mode for web */
+@media (prefers-color-scheme: dark) {
+    :root {
+        color-scheme: dark;
+    }
+}
+
+/* Suppress NativeWind color scheme warnings on web */
+@supports (color-scheme: dark) {
+    :root {
+        color-scheme: dark;
+    }
+}

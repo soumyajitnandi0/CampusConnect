@@ -41,13 +41,13 @@ export class CheckInService {
 
       console.log('Sending check-in request:', { eventId, hasQrToken: !!qrData });
 
-      const response = await api.post('/attendance/verify', payload, {
-        headers: { 'x-auth-token': token },
-      });
+      // API client automatically adds token via interceptor
+      const response = await api.post('/attendance/verify', payload);
 
-      console.log('Check-in response:', response.data);
+      console.log('Check-in response:', response);
       
-      return response.data;
+      // API client extracts data, so response is already the data
+      return response;
     } catch (error: any) {
       console.error('Check-in error details:', {
         message: error.message,
@@ -55,7 +55,7 @@ export class CheckInService {
         status: error.response?.status,
       });
       
-      const errorMessage = error.response?.data?.msg || error.message || 'Failed to check in';
+      const errorMessage = error.message || 'Failed to check in';
       throw new Error(errorMessage);
     }
   }
@@ -63,15 +63,26 @@ export class CheckInService {
   /**
    * Get check-in status for a user and event
    */
-  static async getCheckInStatus(eventId: string, userId: string): Promise<boolean> {
+  static async getCheckInStatus(eventId: string, userId: string): Promise<{
+    attended: boolean;
+    checkInTime: Date | null;
+    rsvpd: boolean;
+  }> {
     try {
-      const token = await storage.getItem('token');
-      const response = await api.get(`/attendance/status/${eventId}/${userId}`, {
-        headers: token ? { 'x-auth-token': token } : {},
-      });
-      return response.data.attended || false;
+      // API client automatically adds token via interceptor
+      const response = await api.get(`/attendance/status/${eventId}/${userId}`);
+      // API client extracts data, so response is already the data object
+      return {
+        attended: response.attended || false,
+        checkInTime: response.checkInTime ? new Date(response.checkInTime) : null,
+        rsvpd: response.rsvpd || false,
+      };
     } catch (error) {
-      return false;
+      return {
+        attended: false,
+        checkInTime: null,
+        rsvpd: false,
+      };
     }
   }
 
@@ -84,13 +95,12 @@ export class CheckInService {
     attendanceRate: number;
   }> {
     try {
-      const token = await storage.getItem('token');
-      const response = await api.get(`/attendance/stats/${eventId}`, {
-        headers: token ? { 'x-auth-token': token } : {},
-      });
-      return response.data;
+      // API client automatically adds token via interceptor
+      const response = await api.get(`/attendance/stats/${eventId}`);
+      // API client extracts data, so response is already the data object
+      return response;
     } catch (error: any) {
-      throw new Error(error.response?.data?.msg || 'Failed to fetch attendance');
+      throw new Error(error.message || 'Failed to fetch attendance');
     }
   }
 
@@ -122,6 +132,84 @@ export class CheckInService {
         throw error;
       }
       throw new Error('Invalid QR code');
+    }
+  }
+
+  /**
+   * Get user attendance records (all successfully checked-in events)
+   */
+  static async getUserAttendance(limit: number = 50, skip: number = 0): Promise<{
+    records: Array<{
+      id: string;
+      checkInTime: Date;
+      event: {
+        id: string;
+        title: string;
+        description: string;
+        date: Date;
+        location: string;
+        organizer: string;
+        clubName?: string;
+        category?: string;
+        imageUrl?: string;
+      };
+    }>;
+    total: number;
+    limit: number;
+    skip: number;
+  }> {
+    try {
+      console.log('Fetching attendance records with limit:', limit, 'skip:', skip);
+
+      // API client automatically adds token via interceptor
+      const response = await api.get('/attendance/user', {
+        params: { limit, skip },
+      });
+
+      // API client extracts data, so response is already the data object
+      console.log('Attendance API response:', {
+        recordsCount: response?.records?.length || 0,
+        total: response?.total || 0,
+        hasRecords: !!response?.records,
+      });
+
+      // Ensure we always return the expected structure
+      if (!response || !Array.isArray(response.records)) {
+        console.warn('Unexpected response structure:', response);
+        return {
+          records: [],
+          total: 0,
+          limit,
+          skip,
+        };
+      }
+
+      // Transform the response data
+      const transformedData = {
+        ...response,
+        records: response.records.map((record: any) => ({
+          ...record,
+          checkInTime: new Date(record.checkInTime),
+          event: {
+            ...record.event,
+            date: new Date(record.event.date),
+          },
+        })),
+      };
+
+      console.log('Transformed attendance data:', {
+        recordsCount: transformedData.records.length,
+        total: transformedData.total,
+      });
+
+      return transformedData;
+    } catch (error: any) {
+      console.error('Error fetching attendance records:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
+      throw new Error(error.message || 'Failed to fetch attendance records');
     }
   }
 }

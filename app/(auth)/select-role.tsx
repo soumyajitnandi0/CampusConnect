@@ -49,22 +49,30 @@ export default function SelectRole() {
 
             setLoading(true);
 
+            // Temporarily store the Supabase token so the interceptor can use it
+            await storage.setItem('token', token);
+
             const response = await api.post(
                 '/auth/sync',
                 {
                     role,
                     ...(role === 'student' && { rollNo, yearSection }),
-                },
-                {
-                    headers: { 'x-auth-token': token },
                 }
             );
 
-            const user = response.data.user;
+            // API client extracts data, so response is already the data object
+            const { token: jwtToken, user } = response;
 
-            // Ensure token is saved (it should already be saved from login, but ensure it's there)
-            const savedToken = await storage.getItem('token');
-            if (!savedToken && token) {
+            // Store the JWT token returned from sync (replaces Supabase token)
+            if (jwtToken) {
+                await storage.setItem('token', jwtToken);
+                console.log('[SelectRole] JWT token stored after sync, length:', jwtToken.length);
+                // Verify token was stored
+                const storedToken = await storage.getItem('token');
+                console.log('[SelectRole] Verified stored token matches:', storedToken === jwtToken);
+            } else if (token) {
+                // Fallback to original token if JWT not returned
+                console.warn('[SelectRole] No JWT token returned, using Supabase token as fallback');
                 await storage.setItem('token', token);
             }
 

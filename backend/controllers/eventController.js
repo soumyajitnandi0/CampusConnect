@@ -155,13 +155,12 @@ exports.createEvent = async (req, res) => {
             return res.status(400).json({ msg: 'Please provide all required fields' });
         }
 
-        // Validate date is not in the past
+        // Validate date is not in the past (compare full date with time)
         const eventDate = new Date(date);
         const now = new Date();
-        now.setHours(0, 0, 0, 0); // Set to start of today for comparison
         
         if (eventDate < now) {
-            return res.status(400).json({ msg: 'Cannot create events in the past. Please select a future date.' });
+            return res.status(400).json({ msg: 'Cannot create events in the past. Please select a future date and time.' });
         }
 
         // Clean and validate imageUrl
@@ -208,10 +207,17 @@ exports.createEvent = async (req, res) => {
         });
 
         const event = await newEvent.save();
+        console.log('Event created successfully:', event._id);
         res.json(event);
     } catch (err) {
-        console.error(err.message);
-        res.status(500).json({ msg: 'Server Error' });
+        console.error('Error creating event:', err);
+        console.error('Error details:', {
+            message: err.message,
+            stack: err.stack,
+            body: req.body,
+            user: req.user
+        });
+        res.status(500).json({ msg: err.message || 'Server Error' });
     }
 };
 

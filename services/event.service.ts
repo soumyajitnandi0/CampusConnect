@@ -15,12 +15,13 @@ export class EventService {
    */
   static async getEvents(): Promise<Event[]> {
     try {
-      const token = await storage.getItem('token');
-      const response = await api.get('/events', {
-        headers: token ? { 'x-auth-token': token } : {},
-      });
+      // API client automatically adds token via interceptor
+      const response = await api.get('/events');
 
-      const events = response.data.map((event: any) => this.transformEvent(event));
+      // API client extracts data, so response is already the array
+      const events = Array.isArray(response) 
+        ? response.map((event: any) => this.transformEvent(event))
+        : [];
       
       // Cache the events
       await this.cacheEvents(events);
@@ -41,13 +42,12 @@ export class EventService {
    */
   static async getEventById(eventId: string): Promise<Event> {
     try {
-      const token = await storage.getItem('token');
-      const response = await api.get(`/events/${eventId}`, {
-        headers: token ? { 'x-auth-token': token } : {},
-      });
-      return this.transformEvent(response.data);
+      // API client automatically adds token via interceptor
+      const response = await api.get(`/events/${eventId}`);
+      // API client extracts data, so response is already the event object
+      return this.transformEvent(response);
     } catch (error: any) {
-      throw new Error(error.response?.data?.msg || 'Failed to fetch event');
+      throw new Error(error.message || 'Failed to fetch event');
     }
   }
 
@@ -56,21 +56,16 @@ export class EventService {
    */
   static async createEvent(eventData: Omit<Event, 'id' | 'createdAt' | 'updatedAt' | 'rsvps' | 'checkedIn' | 'rsvpCount'>): Promise<string> {
     try {
-      const token = await storage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication required');
-      }
-
-      const response = await api.post('/events', eventData, {
-        headers: { 'x-auth-token': token },
-      });
+      // API client automatically adds token via interceptor
+      const response = await api.post('/events', eventData);
 
       // Invalidate cache
       await this.clearCache();
 
-      return response.data._id || response.data.id;
+      // API client extracts data, so response is already the event object
+      return response._id || response.id;
     } catch (error: any) {
-      throw new Error(error.response?.data?.msg || 'Failed to create event');
+      throw new Error(error.message || 'Failed to create event');
     }
   }
 
@@ -79,19 +74,13 @@ export class EventService {
    */
   static async updateEvent(eventId: string, updates: Partial<Event>): Promise<void> {
     try {
-      const token = await storage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication required');
-      }
-
-      await api.put(`/events/${eventId}`, updates, {
-        headers: { 'x-auth-token': token },
-      });
+      // API client automatically adds token via interceptor
+      await api.put(`/events/${eventId}`, updates);
 
       // Invalidate cache
       await this.clearCache();
     } catch (error: any) {
-      throw new Error(error.response?.data?.msg || 'Failed to update event');
+      throw new Error(error.message || 'Failed to update event');
     }
   }
 
@@ -100,19 +89,13 @@ export class EventService {
    */
   static async deleteEvent(eventId: string): Promise<void> {
     try {
-      const token = await storage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication required');
-      }
-
-      await api.delete(`/events/${eventId}`, {
-        headers: { 'x-auth-token': token },
-      });
+      // API client automatically adds token via interceptor
+      await api.delete(`/events/${eventId}`);
 
       // Invalidate cache
       await this.clearCache();
     } catch (error: any) {
-      throw new Error(error.response?.data?.msg || 'Failed to delete event');
+      throw new Error(error.message || 'Failed to delete event');
     }
   }
 
@@ -121,13 +104,14 @@ export class EventService {
    */
   static async getEventsByCreator(organizerId: string): Promise<Event[]> {
     try {
-      const token = await storage.getItem('token');
-      const response = await api.get(`/events/organizer/${organizerId}`, {
-        headers: token ? { 'x-auth-token': token } : {},
-      });
-      return response.data.map((event: any) => this.transformEvent(event));
+      // API client automatically adds token via interceptor
+      const response = await api.get(`/events/organizer/${organizerId}`);
+      // API client extracts data, so response is already the array
+      return Array.isArray(response)
+        ? response.map((event: any) => this.transformEvent(event))
+        : [];
     } catch (error: any) {
-      throw new Error(error.response?.data?.msg || 'Failed to fetch events');
+      throw new Error(error.message || 'Failed to fetch events');
     }
   }
 
@@ -136,17 +120,15 @@ export class EventService {
    */
   static async getMyEvents(): Promise<Event[]> {
     try {
-      const token = await storage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication required');
-      }
-
-      const response = await api.get('/events/my-events', {
-        headers: { 'x-auth-token': token },
-      });
-      return response.data.map((event: any) => this.transformEvent(event));
+      // API client automatically adds token via interceptor
+      const response = await api.get('/events/my-events');
+      // API client extracts data, so response is already the array
+      return Array.isArray(response)
+        ? response.map((event: any) => this.transformEvent(event))
+        : [];
     } catch (error: any) {
-      throw new Error(error.response?.data?.msg || 'Failed to fetch my events');
+      console.error('Error in getMyEvents:', error);
+      throw new Error(error.message || 'Failed to fetch my events');
     }
   }
 

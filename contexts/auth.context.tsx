@@ -22,7 +22,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    checkAuthState();
+    // Clean up any old Supabase tokens on startup
+    const cleanupOldTokens = async () => {
+      try {
+        const token = await storage.getItem('token');
+        if (token) {
+          const tokenParts = token.split('.');
+          // If token doesn't have 3 parts, it's not a valid JWT
+          // Clear it so user can re-authenticate
+          if (tokenParts.length !== 3) {
+            console.log('[Auth] Cleaning up invalid token format');
+            await storage.removeItem('token');
+          } else {
+            // Decode to check if it's a Supabase token (has email but no user.id)
+            try {
+              const base64Url = tokenParts[1];
+              const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+              const payload = JSON.parse(atob(base64));
+              // If it's a Supabase token (has email but no user.id), clear it
+              if (payload.email && !payload.user?.id) {
+                console.log('[Auth] Cleaning up old Supabase token - user needs to re-authenticate');
+                await storage.multiRemove(['token', 'user']);
+              }
+            } catch (e) {
+              // If we can't decode, it might be corrupted - clear it
+              console.log('[Auth] Token decode failed, clearing token');
+              await storage.removeItem('token');
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[Auth] Error during token cleanup:', error);
+      }
+    };
+
+    cleanupOldTokens().then(() => {
+      checkAuthState();
+    });
     
     // Listen to Supabase auth changes (only for OAuth users)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -61,6 +97,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userStr = await storage.getItem('user');
 
       if (token && userStr) {
+        // Verify token is a JWT token (not Supabase token)
+        // JWT tokens have 3 parts separated by dots
+        const tokenParts = token.split('.');
+        if (tokenParts.length !== 3) {
+          console.warn('[Auth] Invalid token format detected, clearing storage');
+          await storage.multiRemove(['token', 'user', 'pushToken']);
+          await sessionManager.clearSession();
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+
         // Check if session timestamp exists, if not create one (for existing logins)
         const isValid = await sessionManager.isSessionValid();
         
@@ -103,20 +151,64 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const syncUser = async (token: string): Promise<void> => {
     try {
-      const response = await api.post('/auth/sync', {}, {
-        headers: { 'x-auth-token': token },
-      });
+      // Temporarily store the Supabase token so the interceptor can use it
+      // This is needed because /auth/sync requires the Supabase token, not the JWT
+      const currentToken = await storage.getItem('token');
+      await storage.setItem('token', token);
+      
+      try {
+        const response = await api.post('/auth/sync', {});
 
-      const userData = response.data.user;
-      setUser(userData);
-      await storage.setItem('user', JSON.stringify(userData));
-      // Update session timestamp on sync (user is still active)
-      await sessionManager.saveLoginTimestamp();
+        // API client extracts data, so response is already the data object
+        const { token: jwtToken, user: userData } = response;
+        
+        if (!userData) {
+          throw new Error('User data not found in response');
+        }
+        
+        // Store the JWT token returned from sync (replaces Supabase token)
+        if (jwtToken) {
+          // Verify it's a JWT token (3 parts separated by dots)
+          const tokenParts = jwtToken.split('.');
+          if (tokenParts.length !== 3) {
+            console.error('[Auth] Invalid JWT token format returned from sync!');
+            throw new Error('Invalid token format received from server');
+          }
+          
+          // Clear any old token first
+          await storage.removeItem('token');
+          
+          // Store the new JWT token
+          await storage.setItem('token', jwtToken);
+          console.log('[Auth] JWT token stored after sync, length:', jwtToken.length);
+          
+          // Verify token was stored correctly
+          const storedToken = await storage.getItem('token');
+          if (storedToken !== jwtToken) {
+            console.error('[Auth] Token storage verification failed!');
+            throw new Error('Token storage failed');
+          }
+          console.log('[Auth] Token storage verified successfully');
+        } else {
+          console.warn('[Auth] No JWT token returned from sync!');
+          throw new Error('No token returned from sync');
+        }
+        
+        setUser(userData);
+        await storage.setItem('user', JSON.stringify(userData));
+        // Update session timestamp on sync (user is still active)
+        await sessionManager.saveLoginTimestamp();
+      } finally {
+        // Restore previous token if sync failed (though we'll store JWT on success)
+        if (!currentToken) {
+          // If there was no previous token, we'll keep whatever was set
+        }
+      }
     } catch (error: any) {
       // If 400 error, it means user needs to select role - this is expected behavior
       // The login screen will handle redirecting to role selection
-      if (error.response?.status === 400) {
-        const errorMsg = error.response?.data?.msg || 'Role selection required';
+      if (error.statusCode === 400 || (error as any).response?.status === 400) {
+        const errorMsg = error.message || 'Role selection required';
         // Only log as info, not error, since this is expected for new users
         console.log('[Auth] User needs role selection:', errorMsg);
         // Don't throw - let the login flow handle it
@@ -134,13 +226,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       const response = await api.post('/auth/login', { email, password });
       
-      const { token, user: userData } = response.data;
+      // API client extracts data, so response is already the data object
+      const { token, user: userData } = response;
+      if (!token || !userData) {
+        throw new Error('Invalid response from server');
+      }
       await storage.setItem('token', token);
       await storage.setItem('user', JSON.stringify(userData));
       await sessionManager.saveLoginTimestamp(); // Save login timestamp for 30-day session
       setUser(userData); // Set user state immediately
     } catch (error: any) {
-      throw new Error(error.response?.data?.msg || 'Login failed');
+      throw new Error(error.message || 'Login failed');
     } finally {
       setLoading(false);
     }
@@ -164,13 +260,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ...(role === 'student' && { rollNo, yearSection }),
       });
 
-      const { token, user: userData } = response.data;
+      // API client extracts data, so response is already the data object
+      const { token, user: userData } = response;
       await storage.setItem('token', token);
       await storage.setItem('user', JSON.stringify(userData));
       await sessionManager.saveLoginTimestamp(); // Save login timestamp
       setUser(userData);
     } catch (error: any) {
-      throw new Error(error.response?.data?.msg || 'Signup failed');
+      throw new Error(error.message || 'Signup failed');
     } finally {
       setLoading(false);
     }
@@ -203,10 +300,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // Optionally refresh from backend
       try {
-        const response = await api.get('/users/me', {
-          headers: { 'x-auth-token': token },
-        });
-        const updatedUser = response.data;
+        // API client automatically adds token via interceptor
+        const response = await api.get('/users/me');
+        // API client extracts data, so response is already the user object
+        const updatedUser = response;
         setUser(updatedUser);
         await storage.setItem('user', JSON.stringify(updatedUser));
       } catch (error) {

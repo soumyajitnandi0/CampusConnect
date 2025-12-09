@@ -30,11 +30,10 @@ export default function RescheduleEvent() {
     const fetchEventDetails = async () => {
         try {
             setFetching(true);
-            const token = await storage.getItem('token');
-            const res = await api.get(`/events/${eventId}`, {
-                headers: { 'x-auth-token': token }
-            });
-            const eventData = res.data;
+            // API client automatically adds token via interceptor
+            const res = await api.get(`/events/${eventId}`);
+            // API client extracts data, so res is already the event object
+            const eventData = res;
             setEvent(eventData);
             setLocation(eventData.location || '');
             setDate(new Date(eventData.date));
@@ -122,11 +121,10 @@ export default function RescheduleEvent() {
                 return;
             }
 
+            // API client automatically adds token via interceptor
             await api.post(`/events/${eventId}/reschedule`, {
                 date: date.toISOString(),
                 location: location
-            }, {
-                headers: { 'x-auth-token': token }
             });
 
             Alert.alert('Success', 'Event rescheduled successfully', [

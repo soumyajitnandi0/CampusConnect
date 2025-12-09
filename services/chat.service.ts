@@ -1,5 +1,4 @@
 import { Message } from '../types/models';
-import { storage } from '../utils/storage';
 import api from './api';
 
 export class ChatService {
@@ -8,16 +7,12 @@ export class ChatService {
    */
   static async sendMessage(clubId: string, message: string): Promise<Message> {
     try {
-      const token = await storage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication required');
-      }
-      const response = await api.post(`/chat/club/${clubId}`, { message }, {
-        headers: { 'x-auth-token': token },
-      });
-      return this.transformMessage(response.data);
+      // API client automatically adds token via interceptor
+      const response = await api.post(`/chat/club/${clubId}`, { message });
+      // API client extracts data, so response is already the message object
+      return this.transformMessage(response);
     } catch (error: any) {
-      throw new Error(error.response?.data?.msg || 'Failed to send message');
+      throw new Error(error.message || 'Failed to send message');
     }
   }
 
@@ -26,21 +21,18 @@ export class ChatService {
    */
   static async getMessages(clubId: string, limit: number = 50, before?: Date): Promise<Message[]> {
     try {
-      const token = await storage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication required');
-      }
       const params: any = { limit };
       if (before) {
         params.before = before.toISOString();
       }
-      const response = await api.get(`/chat/club/${clubId}`, {
-        params,
-        headers: { 'x-auth-token': token },
-      });
-      return response.data.map((msg: any) => this.transformMessage(msg));
+      // API client automatically adds token via interceptor
+      const response = await api.get(`/chat/club/${clubId}`, { params });
+      // API client extracts data, so response is already the array
+      return Array.isArray(response)
+        ? response.map((msg: any) => this.transformMessage(msg))
+        : [];
     } catch (error: any) {
-      throw new Error(error.response?.data?.msg || 'Failed to fetch messages');
+      throw new Error(error.message || 'Failed to fetch messages');
     }
   }
 
@@ -49,15 +41,10 @@ export class ChatService {
    */
   static async deleteMessage(messageId: string): Promise<void> {
     try {
-      const token = await storage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication required');
-      }
-      await api.delete(`/chat/${messageId}`, {
-        headers: { 'x-auth-token': token },
-      });
+      // API client automatically adds token via interceptor
+      await api.delete(`/chat/${messageId}`);
     } catch (error: any) {
-      throw new Error(error.response?.data?.msg || 'Failed to delete message');
+      throw new Error(error.message || 'Failed to delete message');
     }
   }
 

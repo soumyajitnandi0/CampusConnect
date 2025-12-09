@@ -215,7 +215,7 @@ export default function CreateEvent() {
                 minutes: minutes
             };
 
-            await api.post('/events', {
+            const eventData = {
                 title,
                 description,
                 date: date.toISOString(),
@@ -224,14 +224,22 @@ export default function CreateEvent() {
                 imageUrl: cleanImageUrl,
                 duration,
                 club: selectedClub || undefined
-            }, {
-                headers: { 'x-auth-token': token }
-            });
+            };
+
+            console.log('Creating event with data:', JSON.stringify(eventData, null, 2));
+
+            // API client automatically adds token via interceptor, no need to pass in headers
+            const response = await api.post('/events', eventData);
+
+            console.log('Event created successfully:', response);
 
             Alert.alert('Success', 'Event created successfully');
             router.back();
         } catch (err: any) {
-            Alert.alert('Error', err.response?.data?.msg || 'Failed to create event');
+            console.error('Error creating event:', err);
+            // Handle both new error types (AppError) and legacy error format
+            const errorMessage = err.message || err.response?.data?.msg || 'Failed to create event';
+            Alert.alert('Error', errorMessage);
         } finally {
             setLoading(false);
         }
