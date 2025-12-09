@@ -9,7 +9,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "build:web": "node scripts/inject-env.js && npx expo export --platform web --output-dir web-build",
-    "serve:web": "npx serve web-build",
+    "serve:web": "npx serve web-build --single --listen 3000",
     "lint": "expo lint"
   },
   "dependencies": {

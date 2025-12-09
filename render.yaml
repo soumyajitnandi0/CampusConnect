@@ -36,7 +36,7 @@ services:
     runtime: node
     plan: free
     buildCommand: npm install && npm run build:web
-    startCommand: npx serve web-build
+    startCommand: npx serve web-build --single --listen $PORT
     envVars:
       - key: EXPO_PUBLIC_API_URL
         value: https://campus-connect-api.onrender.com/api

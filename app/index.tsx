@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Platform } from 'react-native';
 import { ScreenWrapper } from '../components/ui/ScreenWrapper';
 import { storage } from '../utils/storage';
-import { supabase } from '../services/supabase';
 
 export default function Index() {
     const router = useRouter();
@@ -14,12 +13,11 @@ export default function Index() {
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
             const hash = window.location.hash;
             if (hash && hash.includes('access_token')) {
-                // OAuth callback detected - redirect to login to handle it
-                const loginUrl = window.location.origin + '/login';
-                if (window.location.pathname !== '/login') {
-                    window.location.href = loginUrl + hash;
-                    return;
-                }
+                // OAuth callback detected - redirect to login page to handle it
+                // Use router to navigate to login with hash preserved
+                const loginPath = '/login' + hash;
+                router.replace(loginPath as any);
+                return;
             }
         }
         checkAuth();
