@@ -51,14 +51,20 @@ const getEnvVar = (key: string, fallback: string): string => {
 const getApiBaseURL = (): string => {
   // Check for environment variable first (for production)
   // Try multiple sources to ensure we get the value
-  const envApiUrl = 
+  let envApiUrl = 
     Constants.expoConfig?.extra?.EXPO_PUBLIC_API_URL ||
     process.env.EXPO_PUBLIC_API_URL ||
     (typeof window !== 'undefined' && (window as any).__ENV__?.EXPO_PUBLIC_API_URL) ||
     '';
   
-  // If we have a valid URL from environment, use it
+  // Normalize the URL - ensure it ends with /api
   if (envApiUrl && envApiUrl.startsWith('http')) {
+    // Remove trailing slash if present
+    envApiUrl = envApiUrl.replace(/\/$/, '');
+    // Add /api if not already present
+    if (!envApiUrl.endsWith('/api')) {
+      envApiUrl = envApiUrl + '/api';
+    }
     return envApiUrl;
   }
   
@@ -77,6 +83,11 @@ const getApiBaseURL = (): string => {
     return 'https://API_URL_NOT_CONFIGURED.onrender.com/api';
   }
   
+  // Normalize before returning
+  envApiUrl = envApiUrl.replace(/\/$/, '');
+  if (!envApiUrl.endsWith('/api')) {
+    envApiUrl = envApiUrl + '/api';
+  }
   return envApiUrl;
 };
 
