@@ -2,16 +2,25 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import { AppState, Platform } from 'react-native';
 
-// Use environment variables if available, otherwise fallback to defaults
+// Get Supabase credentials from environment variables
+// In production, these MUST be set via Render environment variables
 // Set these in your .env file or Expo environment:
 // EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 // EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || "https://cuzzxgjdxwlswhuzhwgg.supabase.co";
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1enp4Z2pkeHdsc3dodXpod2dnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM5OTc0NDcsImV4cCI6MjA3OTU3MzQ0N30.VlSuDu0sZDXg6Q6-stgUPq3f_vZ86jeH-sY0_ijSSXQ";
+// Development fallbacks (only for local development)
+const DEV_SUPABASE_URL = __DEV__ ? "https://cuzzxgjdxwlswhuzhwgg.supabase.co" : undefined;
+const DEV_SUPABASE_KEY = __DEV__ ? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1enp4Z2pkeHdsc3dodXpod2dnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM5OTc0NDcsImV4cCI6MjA3OTU3MzQ0N30.VlSuDu0sZDXg6Q6-stgUPq3f_vZ86jeH-sY0_ijSSXQ" : undefined;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn('Supabase credentials not configured. Please set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY');
+const finalSupabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || DEV_SUPABASE_URL;
+const finalSupabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || DEV_SUPABASE_KEY;
+
+if (!finalSupabaseUrl || !finalSupabaseKey) {
+    if (__DEV__) {
+        console.warn('⚠️ Supabase credentials not configured. Please set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY');
+    } else {
+        throw new Error('Missing required Supabase credentials. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY environment variables.');
+    }
 }
 
 // Create a web-compatible storage adapter
@@ -40,7 +49,7 @@ const getStorage = () => {
     return AsyncStorage;
 };
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(finalSupabaseUrl!, finalSupabaseKey!, {
     auth: {
         storage: getStorage(),
         autoRefreshToken: true,
