@@ -1,14 +1,27 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator } from 'react-native';
+import { ActivityIndicator, Platform } from 'react-native';
 import { ScreenWrapper } from '../components/ui/ScreenWrapper';
 import { storage } from '../utils/storage';
+import { supabase } from '../services/supabase';
 
 export default function Index() {
     const router = useRouter();
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        // Handle OAuth callback on web first (before auth check)
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+            const hash = window.location.hash;
+            if (hash && hash.includes('access_token')) {
+                // OAuth callback detected - redirect to login to handle it
+                const loginUrl = window.location.origin + '/login';
+                if (window.location.pathname !== '/login') {
+                    window.location.href = loginUrl + hash;
+                    return;
+                }
+            }
+        }
         checkAuth();
     }, []);
 

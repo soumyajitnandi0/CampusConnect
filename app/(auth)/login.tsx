@@ -265,8 +265,8 @@ export default function Login() {
             // For web, use window location for redirect. For mobile, use deep link
             let redirectUrl: string;
             if (Platform.OS === 'web' && typeof window !== 'undefined') {
-                // Use the full current URL as the redirect URL
-                redirectUrl = `${window.location.origin}${window.location.pathname}`;
+                // Use the login page URL as redirect (works with SPA routing)
+                redirectUrl = `${window.location.origin}/login`;
                 console.log('Web redirect URL:', redirectUrl);
             } else {
                 redirectUrl = Linking.createURL('/login');

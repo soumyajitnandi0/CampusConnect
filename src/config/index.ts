@@ -91,9 +91,21 @@ const getApiBaseURL = (): string => {
   return envApiUrl;
 };
 
+const apiBaseURL = getApiBaseURL();
+
+// Debug logging in development
+if (__DEV__) {
+  console.log('🔧 API Base URL configured:', apiBaseURL);
+  console.log('🔧 Environment check:', {
+    expoExtra: Constants.expoConfig?.extra?.EXPO_PUBLIC_API_URL,
+    processEnv: process.env.EXPO_PUBLIC_API_URL,
+    windowEnv: typeof window !== 'undefined' ? (window as any).__ENV__?.EXPO_PUBLIC_API_URL : 'N/A',
+  });
+}
+
 export const config: Config = {
   api: {
-    baseURL: getApiBaseURL(),
+    baseURL: apiBaseURL,
     timeout: 30000, // 30 seconds
   },
   supabase: {
