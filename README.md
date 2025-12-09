@@ -287,6 +287,34 @@ Campus Connect uses Cloudinary for image uploads and transformations:
 - **Offline Support**: Network status detection with offline banner
 - **Push Notifications**: Expo notifications (configured but optional)
 
+## 🚀 Deployment
+
+### Render Deployment
+
+Campus Connect can be deployed to Render for production. See the detailed deployment guide:
+
+- **[RENDER_DEPLOYMENT.md](./RENDER_DEPLOYMENT.md)** - Quick start guide for Render
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Comprehensive deployment documentation
+
+#### Quick Deploy Steps
+
+1. **Backend**: Deploy as Web Service on Render
+   - Root Directory: `backend`
+   - Build Command: `npm install`
+   - Start Command: `npm start`
+   - Set environment variables (see `.env.example`)
+
+2. **Frontend**: Deploy as Static Site on Render
+   - Build Command: `npm install && npm run build:web`
+   - Publish Directory: `web-build`
+   - Set `EXPO_PUBLIC_API_URL` to your backend URL
+
+3. **Update CORS**: Set `CORS_ORIGIN` in backend to frontend URL
+
+4. **Update Supabase**: Add frontend URL to redirect URLs
+
+For detailed instructions, see [RENDER_DEPLOYMENT.md](./RENDER_DEPLOYMENT.md).
+
 ## 📱 Platform Support
 
 - ✅ iOS

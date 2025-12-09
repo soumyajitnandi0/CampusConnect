@@ -27,17 +27,38 @@ interface Config {
 }
 
 // Get environment variables
+// Priority: 1. app.json extra, 2. process.env (build-time), 3. window.__ENV__ (runtime), 4. fallback
 const getEnvVar = (key: string, fallback: string): string => {
-  return Constants.expoConfig?.extra?.[key] || 
-         process.env[key] || 
-         fallback;
+  // Check app.json extra first (injected at build time)
+  if (Constants.expoConfig?.extra?.[key]) {
+    return Constants.expoConfig.extra[key];
+  }
+  
+  // Check process.env (available during build)
+  if (process.env[key]) {
+    return process.env[key];
+  }
+  
+  // Check window.__ENV__ for runtime injection (web only)
+  if (typeof window !== 'undefined' && (window as any).__ENV__?.[key]) {
+    return (window as any).__ENV__[key];
+  }
+  
+  return fallback;
 };
 
 // Determine API base URL
 const getApiBaseURL = (): string => {
   // Check for environment variable first (for production)
-  const envApiUrl = getEnvVar('EXPO_PUBLIC_API_URL', '');
-  if (envApiUrl) {
+  // Try multiple sources to ensure we get the value
+  const envApiUrl = 
+    Constants.expoConfig?.extra?.EXPO_PUBLIC_API_URL ||
+    process.env.EXPO_PUBLIC_API_URL ||
+    (typeof window !== 'undefined' && (window as any).__ENV__?.EXPO_PUBLIC_API_URL) ||
+    '';
+  
+  // If we have a valid URL from environment, use it
+  if (envApiUrl && envApiUrl.startsWith('http')) {
     return envApiUrl;
   }
   
@@ -46,11 +67,17 @@ const getApiBaseURL = (): string => {
     // Note: Mobile IP should be configured per developer's network
     return Platform.OS === 'web' 
       ? 'http://localhost:5000/api'
-      : process.env.EXPO_PUBLIC_API_URL || 'http://10.20.21.152:5000/api';
+      : 'http://10.20.21.152:5000/api';
   }
   
-  // Production fallback (should not be reached if EXPO_PUBLIC_API_URL is set)
-  return 'https://api.campusconnect.com/api';
+  // Production: throw error if no API URL is configured
+  if (!envApiUrl) {
+    console.error('❌ EXPO_PUBLIC_API_URL is not set! Please configure it in Render environment variables.');
+    // Return a placeholder that will fail clearly
+    return 'https://API_URL_NOT_CONFIGURED.onrender.com/api';
+  }
+  
+  return envApiUrl;
 };
 
 export const config: Config = {
